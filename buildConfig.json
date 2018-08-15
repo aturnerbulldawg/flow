@@ -2,7 +2,7 @@
 	"projectInfo": {
 		"name": "flow",
 		"language": "python",
-		"versionStrategy": "tracker"
+		"versionStrategy": "jira"
 	},
 
 	"artifact": {
@@ -16,13 +16,11 @@
 	},
 
 	"jira": {
-		"url": "http://127.0.0.1:8081/browse/TEST-10",
+		"url": "http://127.0.0.1:8081",
 		"projectId": "Test"
 	},
 
-	"tracker": {
-		"projectId": 2135573
-	},
+
 
 	"slack": {
 		"botName": "Flow",
