@@ -10,9 +10,14 @@
 	},
 
 	"github": {
-		"org": "homedepot",
+		"org": "aturnerbulldawg",
 		"repo": "flow",
 		"URL": "https://api.github.com/repos"
+	},
+
+	"jira": {
+		"url": "http://127.0.0.1:8081/browse/TEST-10",
+		"projectId": "Test"
 	},
 
 	"tracker": {
