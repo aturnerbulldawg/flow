@@ -20,7 +20,9 @@
 		"projectId": "Test"
 	},
 
-
+	"servicenow": {
+		"url": "https://dev48297.service-now.com"
+	},
 
 	"slack": {
 		"botName": "Flow",

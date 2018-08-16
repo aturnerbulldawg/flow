@@ -42,7 +42,7 @@ def byteify(input_str):
 
 
 # TODO this could probably be moved to the abc for code repo
-def extract_story_id_from_commit_messages(commit_messages):
+def extract_story_id_from_commit_messages(commit_messages, numeric_only=True):
     method = 'extract_story_id_from_commit_messages'
     story_list = []
 
@@ -65,8 +65,12 @@ def extract_story_id_from_commit_messages(commit_messages):
                 # verify there isn't a embedded bracket, if so just skip this one and keep marching.
                 if stories.find('[') == -1:  # there is a nested starting bracket
                     # now dig out the number in single number format or multiple separated by commas.
-                    r = re.compile('[0-9,]+(,[0-8]+)*,?')
-                    stories = ''.join(filter(r.match, stories))
+                    if numeric_only:
+                        r = re.compile('[0-9,]+(,[0-8]+)*,?')
+                        stories = ''.join(filter(r.match, stories))
+                    else:
+                        r = re.compile('[a-zA-Z0-9,-]+(,[a-zA-Z0-9-]+)*,?')
+                        stories = ''.join(filter(r.match, stories))
 
                     for story in [_f for _f in stories.split(',') if _f]:
                         # split out by comma.

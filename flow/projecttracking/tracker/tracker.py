@@ -6,8 +6,8 @@ from flow.buildconfig import BuildConfig
 from flow.projecttracking.project_tracking_abc import Project_Tracking
 
 import flow.utils.commons as commons
+from flow.projecttracking.story import Story
 from flow.utils.commons import Object
-
 
 class Tracker(Project_Tracking):
 
@@ -105,8 +105,17 @@ class Tracker(Project_Tracking):
                                                     "Response: {response}".format(url=tracker_story_details_url,
                                                                                   response=resp.text), 'WARN')
 
+        story = Story()
+        story.id = json_data.get('id')
+        story.description = json_data.get('description')
+        story.url = json_data.get('url')
+        story.name = json_data.get('name')
+        story.story_type = json_data.get('story_type')
+
         commons.print_msg(Tracker.clazz, method, 'end')
-        return json_data
+
+        return story
+
 
     def tag_stories_in_commit(self, story_list):
         method = 'tag_stories_in_commit'
@@ -144,7 +153,7 @@ class Tracker(Project_Tracking):
                                                                                        response=resp.text), 'WARN')
             else:
                 commons.print_msg(Tracker.clazz, method, resp.text)
-        except requests.ConnectionError:
+        except requests.ConnectionError as e:
             commons.print_msg(Tracker.clazz, method, 'Connection error. ' + str(e), 'WARN')
         except Exception as e:
             commons.print_msg(Tracker.clazz, method, "Unable to tag story {story} with label {lbl}".format(

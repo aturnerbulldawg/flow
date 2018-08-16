@@ -1,0 +1,11 @@
+{
+  "tests/artifactstorage/artifactory/test_artifactory.py": true,
+  "tests/cloud/cloudfoundry/test_cloudfoundry.py": true,
+  "tests/cloud/gcappengine/test_gcappengine.py": true,
+  "tests/coderepo/github/test_github.py": true,
+  "tests/communications/slack/test_slack.py": true,
+  "tests/projecttracking/tracker/test_tracker.py": true,
+  "tests/staticqualityanalysis/sonar/test_sonar.py": true,
+  "tests/test_aggregator.py": true,
+  "tests/utils/test_commons.py": true
+}

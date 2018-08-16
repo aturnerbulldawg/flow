@@ -16,6 +16,7 @@ from flow.coderepo.code_repo_abc import Code_Repo
 import flow.utils.commons as cicommons
 import flow.utils.commons as commons
 from flow.utils.commons import Object
+from flow.projecttracking.story import Story
 
 
 class GitHub(Code_Repo):
@@ -205,7 +206,6 @@ class GitHub(Code_Repo):
 
         commons.print_msg(GitHub.clazz, method, 'end')
 
-    # TODO story details format shouldn't be specific to tracker.  Need to make a common story detail object instead.
     def format_github_specific_release_notes_from_tracker_story_details(self, story_details):
 
         formatted_release_notes = None
@@ -213,11 +213,11 @@ class GitHub(Code_Repo):
         if story_details is not None and isinstance(story_details, list) and len(story_details) > 0:
 
             for i, release_note in enumerate(story_details):
-                if release_note.get('story_type') == "release":
+                if release_note.story_type == "release":
                     story_emoji = ":checkered_flag:"
-                elif release_note.get('story_type') == "bug":
+                elif release_note.story_type == "bug":
                     story_emoji = ":beetle:"
-                elif release_note.get('story_type') == "chore":
+                elif release_note.story_type == "chore":
                     story_emoji = ":wrench:"
                 else:
                     story_emoji = ":star:"
@@ -225,9 +225,9 @@ class GitHub(Code_Repo):
                 if formatted_release_notes is None:
                     formatted_release_notes = ""
 
-                formatted_release_notes = formatted_release_notes + story_emoji + '<a href="' + release_note.get('url') + '">' + release_note.get('story_type') + ' **' + str(release_note.get('id')) + '**</a>' + ' ' + '\r\n ' + \
-                               '&nbsp;&nbsp;&nbsp;&nbsp; **' + release_note.get('name') + '** \r\n ' + \
-                               '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + (release_note.get('description').replace('\n', '\r\n &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;') + '\r\n' if release_note.get('description') is not None else '') + '\r\n\r\n'
+                formatted_release_notes = formatted_release_notes + story_emoji + '<a href="' + release_note.url + '">' + release_note.story_type + ' **' + str(release_note.id) + '**</a>' + ' ' + '\r\n ' + \
+                               '&nbsp;&nbsp;&nbsp;&nbsp; **' + release_note.name + '** \r\n ' + \
+                               '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + (release_note.description.replace('\n', '\r\n &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;') + '\r\n' if release_note.description is not None else '') + '\r\n\r\n'
 
         if formatted_release_notes is None:
             formatted_release_notes = 'No Release Notes'
@@ -718,7 +718,7 @@ class GitHub(Code_Repo):
         # if you set the semver_array_beginning_version to None, it will pull *ALL* history **be gentle**
 
         method = 'get_all_git_commit_history_between_provided_tags'
-        commons.print_msg(GitHub.clazz, method, method)
+        commons.print_msg(GitHub.clazz, method, "begin")
 
         if self.verify_sem_ver_tag(semver_array_beginning_version) is False:
             commons.print_msg(GitHub.clazz, method, "Invalid beginning version defined {}".format(
