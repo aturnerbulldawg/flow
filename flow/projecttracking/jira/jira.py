@@ -94,7 +94,7 @@ class Jira(Project_Tracking):
             exit(1)
         except Exception as e:
             commons.print_msg(Jira.clazz, method, "Failed retrieving story detail from call to {} ".format(
-                jira_story_details_url), 'ERROR')
+                jira_story_details_url), 'WARN')
             commons.print_msg(Jira.clazz, method, e, 'ERROR')
             exit(1)
 
@@ -105,21 +105,22 @@ class Jira(Project_Tracking):
             json_data = json.loads(resp.text)
             commons.print_msg(Jira.clazz, method, json_data)
             commons.print_msg(Jira.clazz, method, resp.text)
+
+            story = Story()
+            story.id = json_data.get('id')
+            story.description = json_data.get('summary')
+            story.url = Jira.jira_url + '/browse/' + json_data.get('key')
+            story.name = json_data.get('key')
+            story.story_type = json_data['fields']['issuetype']['name'].lower()
+            story.labels = json_data['fields']['labels']
+            story.versions = []
+            for version in json_data['fields']['fixVersions']:
+                story.versions.append(version["name"])
+
         else:
             commons.print_msg(Jira.clazz, method, "Failed retrieving story detail from call to {url}. \r\n "
                                                     "Response: {response}".format(url=jira_story_details_url,
                                                                                   response=resp.text), 'WARN')
-
-        story = Story()
-        story.id = json_data.get('id')
-        story.description = json_data.get('summary')
-        story.url = Jira.jira_url + '/browse/' + json_data.get('key')
-        story.name = json_data.get('key')
-        story.story_type = json_data['fields']['issuetype']['name'].lower()
-        story.labels = json_data['fields']['labels']
-        story.versions = []
-        for version in json_data['fields']['fixVersions']:
-            story.versions.append(version["name"])
 
         commons.print_msg(Jira.clazz, method, 'end')
 
