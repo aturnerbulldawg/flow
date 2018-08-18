@@ -101,7 +101,7 @@ class Jira(Project_Tracking):
         json_data = None
 
         story = Story()
-        
+
         # noinspection PyUnboundLocalVariable
         if resp.status_code == 200:
             json_data = json.loads(resp.text)

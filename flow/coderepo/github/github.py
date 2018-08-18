@@ -213,21 +213,22 @@ class GitHub(Code_Repo):
         if story_details is not None and isinstance(story_details, list) and len(story_details) > 0:
 
             for i, release_note in enumerate(story_details):
-                if release_note.story_type == "release":
-                    story_emoji = ":checkered_flag:"
-                elif release_note.story_type == "bug":
-                    story_emoji = ":beetle:"
-                elif release_note.story_type == "chore":
-                    story_emoji = ":wrench:"
-                else:
-                    story_emoji = ":star:"
+                if release_note is not None:
+                    if release_note.story_type == "release":
+                        story_emoji = ":checkered_flag:"
+                    elif release_note.story_type == "bug":
+                        story_emoji = ":beetle:"
+                    elif release_note.story_type == "chore":
+                        story_emoji = ":wrench:"
+                    else:
+                        story_emoji = ":star:"
 
-                if formatted_release_notes is None:
-                    formatted_release_notes = ""
+                    if formatted_release_notes is None:
+                        formatted_release_notes = ""
 
-                formatted_release_notes = formatted_release_notes + story_emoji + '<a href="' + release_note.url + '">' + release_note.story_type + ' **' + str(release_note.id) + '**</a>' + ' ' + '\r\n ' + \
-                               '&nbsp;&nbsp;&nbsp;&nbsp; **' + release_note.name + '** \r\n ' + \
-                               '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + (release_note.description.replace('\n', '\r\n &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;') + '\r\n' if release_note.description is not None else '') + '\r\n\r\n'
+                    formatted_release_notes = formatted_release_notes + story_emoji + '<a href="' + release_note.url + '">' + release_note.story_type + ' **' + str(release_note.id) + '**</a>' + ' ' + '\r\n ' + \
+                                   '&nbsp;&nbsp;&nbsp;&nbsp; **' + release_note.name + '** \r\n ' + \
+                                   '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + (release_note.description.replace('\n', '\r\n &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;') + '\r\n' if release_note.description is not None else '') + '\r\n\r\n'
 
         if formatted_release_notes is None:
             formatted_release_notes = 'No Release Notes'
