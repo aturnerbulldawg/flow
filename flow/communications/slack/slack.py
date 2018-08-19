@@ -111,18 +111,18 @@ class Slack(communications):
             slack_message.attachments.append(attachment)
 
         # story details
-        for i, release_note in enumerate(story_details):
-            if release_note.get('story_type') == 'release':
+        for i, story in enumerate(story_details):
+            if story.story_type == 'release':
                 story_emoji = ':checkered_flag:'
-            elif release_note.get('story_type') == 'bug':
+            elif story.story_type == 'bug':
                 story_emoji = ':beetle:'
-            elif release_note.get('story_type') == 'chore':
+            elif story.story_type == 'chore':
                 story_emoji = ':wrench:'
             else:
                 story_emoji = ':star:'
 
             attachment = Object()
-            attachment.fallback = release_note.get('name')
+            attachment.fallback = story.name
             attachment.mrkdwn_in = ['pretext', 'fields']
             if (BuildConfig.settings.has_section('slack') and BuildConfig.settings.has_option('slack',
                                                                                               'release_note_attachment_color')):
@@ -140,20 +140,21 @@ class Slack(communications):
             attachment.fields = []
 
             attachment_field = Object()
-            attachment_field.value = "*" + str(release_note.get('id')) + "*                                                                                                             " + story_emoji + ' _' + release_note.get('story_type') + "_"
+            attachment_field.value = "*" + str(story.id) + "*                                                                                                             " + story_emoji + ' _' + story.story_type + "_"
             attachment_field.short = True
             attachment.fields.append(attachment_field)
             attachment_field = Object()
-            attachment_field.value = '*<' + release_note.get('url') + '|' + release_note.get('name') + '>*'
+            attachment_field.value = '*<' + story.url + '|' + story.name + '>*'
             attachment.fields.append(attachment_field)
             attachment_field = Object()
-            if release_note.get('description') is None or len(release_note.get('description').strip()) == 0:
+            if story.description is None or len(story.description.strip()) == 0:
                 attachment_field.value = '_No description_'
             else:
-                attachment_field.value = (release_note.get('description')[:150] + '..') if len(release_note.get('description')) > 150 else release_note.get('description')
+                attachment_field.value = (story.description[:150] + '..') if len(story.description) > 150 else story.description
             attachment.fields.append(attachment_field)
             attachment_field = Object()
-            attachment_field.value = '*Status*: ' + release_note.get('current_state')
+            # TODO: Put this back
+            # attachment_field.value = '*Status*: ' + story.description
             attachment_field.short = True
             attachment.fields.append(attachment_field)
 
