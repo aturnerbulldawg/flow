@@ -3,7 +3,7 @@ import requests
 import flow.utils.commons as commons
 from flow.buildconfig import BuildConfig
 from flow.utils.commons import Object
-
+import os
 
 class ServiceNow():
 
@@ -43,9 +43,9 @@ class ServiceNow():
         servicenow_create_chg_url = ServiceNow.servicenow_url + '/api/now/table/change_request'
 
         cr = Object()
-        cr.reason = 'abcs'
+        cr.reason = 'Continuous Deployment'
         headers = {'Content-type': 'application/json', 'Accept': 'application/json',
-                   'Authorization': "Bearer IOxg0beB8jeCdXISn4-am7uuTUImKxD5tBULd-em--teqtcCa7_OuTwzkyAZBZi2xGSksuXbsQmy9gc-_PpqXg"}
+                   'Authorization': "Bearer {}".format(os.getenv('SERVICENOW_TOKEN'))}
 
         print(servicenow_create_chg_url)
         resp = requests.post(servicenow_create_chg_url, cr.to_JSON(), headers=headers)

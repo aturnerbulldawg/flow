@@ -132,6 +132,8 @@ class Jira(Project_Tracking):
         method = 'tag_stories_in_commit'
         commons.print_msg(Jira.clazz, method, 'begin')
 
+        self._create_version(self.config.project_name + '-' + self.config.version_number)
+
         for story in story_list:
             label = self.config.project_name + '-' + self.config.version_number
 
@@ -184,8 +186,6 @@ class Jira(Project_Tracking):
 
         versions = detail.versions
         versions.append(label)
-
-        self._create_version(self.config.project_name + '-' + self.config.version_number)
 
         add_version_story = Object()
         add_version_story.update = Object()
