@@ -329,7 +329,7 @@ class Slack(communications):
         commons.print_msg(Slack.clazz, method, 'end')
 
     def publish_custom_message(self, message, channel=None, user='Flow', icon=None, emoji=None,
-                               attachment_color=None, slack_url=None):
+                               attachment_color=None, slack_url=None, button_text=None, button_link=None):
         method = 'publish_custom_message'
         commons.print_msg(Slack.clazz, method, 'begin')
 

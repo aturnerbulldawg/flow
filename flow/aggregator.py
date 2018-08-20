@@ -88,7 +88,7 @@ def main():
 
     commons.print_msg(clazz, method, "Task {}".format(task))
 
-    tasks_requiring_github.extend(['sonar', 'tracker', 'jira', 'slack', 'artifactory', 'cf', 'zipit', 'gcappengine'])
+    tasks_requiring_github.extend(['sonar', 'tracker', 'jira', 'slack', 'artifactory', 'cf', 'zipit', 'gcappengine', 'servicenow'])
 
     if task != 'github' and task in tasks_requiring_github:
         github = GitHub()
@@ -160,8 +160,6 @@ def main():
         slack = Slack()
 
         if args.action == 'release':
-
-            projectTracker = None
             commits = get_git_commit_history(github, args)
             story_details = None
 
@@ -308,7 +306,20 @@ def main():
     elif task == 'servicenow':
         service_now = ServiceNow()
 
-        service_now.create_chg()
+        commits = get_git_commit_history(github, args)
+
+        if 'tracker' in BuildConfig.json_config:
+            projectTracker = Tracker()
+            if projectTracker is not None:
+                story_list = commons.extract_story_id_from_commit_messages(commits)
+                story_details = projectTracker.get_details_for_all_stories(story_list)
+        elif 'jira' in BuildConfig.json_config:
+            projectTracker = Jira()
+            if projectTracker is not None:
+                story_list = commons.extract_story_id_from_commit_messages(commits, numeric_only=False)
+                story_details = projectTracker.get_details_for_all_stories(story_list)
+
+        service_now.create_chg(story_details)
         metrics.write_metric(task, args.action)
     else:
         for i in plugins:

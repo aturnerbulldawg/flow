@@ -87,7 +87,7 @@ class Jira(Project_Tracking):
 
         try:
             # TODO: Remove auth from below...
-            resp = requests.get(jira_story_details_url, auth=("admin", "admin"), headers=headers,
+            resp = requests.get(jira_story_details_url, auth=(os.getenv('JIRA_USER'), os.getenv('JIRA_PWD')), headers=headers,
                                 timeout=self.http_timeout)
         except requests.ConnectionError:
             commons.print_msg(Jira.clazz, method, 'Request to Jira timed out.', 'ERROR')
@@ -110,7 +110,7 @@ class Jira(Project_Tracking):
 
             story = Story()
             story.id = json_data.get('id')
-            story.description = json_data.get('summary')
+            story.description = json_data['fields']['summary'].lower()
             story.url = Jira.jira_url + '/browse/' + json_data.get('key')
             story.name = json_data.get('key')
             story.story_type = json_data['fields']['issuetype']['name'].lower()
