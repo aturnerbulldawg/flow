@@ -790,6 +790,7 @@ class CloudFoundry(Cloud):
         service_pos = route_header.index('service')
 
         all_routes_cmd = "{path}cf routes".format(path=CloudFoundry.path_to_cf)
+        print(all_routes_cmd)
         app_search_string = "{app}{version}".format(app="{}-".format(app_name) if app_name is not None else "",
                                                     version=app_version if app_version is not None else "")
         filtered_application_cmd = "grep {}".format(app_search_string)
