@@ -850,7 +850,7 @@ class CloudFoundry(Cloud):
                 self._map_route(app=app,domain=route.domain, host=route.host, route_path=path.replace('/cold','')) 
                 self._unmap_route(app=app,domain=route.domain,host=route.host,route_path=route.path)
         
-        self._restart_app(app)
+                self._restart_app(app)
         
     def deploy(self, force_deploy=False, manifest=None, blue_green=False):
         method = 'deploy'
