@@ -870,6 +870,7 @@ class CloudFoundry(Cloud):
             self._unmap_route(app="{app}-{version}".format(app=self.config.project_name, version=self.config.version_number),domain=route.domain, host=route.host, route_path=route.path) 
         #self._cf_push(manifest, blue_green)
 
+        self._start_app("{app}-{version}".format(app=self.config.project_name, version=self.config.version_number))
         #if blue_green:
         #    self._change_route_to_cold_route()
 
@@ -883,5 +884,32 @@ class CloudFoundry(Cloud):
             self._unmap_delete_previous_versions()
 
         commons.print_msg(CloudFoundry.clazz, method, 'DEPLOYMENT SUCCESSFUL')
+
+        commons.print_msg(CloudFoundry.clazz, method, 'end')
+        
+    def _start_app(self, app):
+        method = '_start_app'
+        commons.print_msg(CloudFoundry.clazz, method, 'begin')
+
+        cmd = "{path}cf start {app_name}".format(path=CloudFoundry.path_to_cf, app_name=app)
+        cf_start = subprocess.Popen(cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        try:
+            cf_start_output, errs = cf_start.communicate(timeout=30)
+
+            if cf_start.returncode != 0:
+                commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return code of {rtn}".format(
+                    command=cmd, rtn=cf_start.returncode), 'ERROR')
+
+                os.system('stty sane')
+                self._cf_logout()
+                exit(1)
+
+        except TimeoutExpired:
+            commons.print_msg(CloudFoundry.clazz, method, "Timed out calling {}".format(cmd), 'ERROR')
+            cf_start.kill()
+            os.system('stty sane')
+            self._cf_logout()
+            exit(1)
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
