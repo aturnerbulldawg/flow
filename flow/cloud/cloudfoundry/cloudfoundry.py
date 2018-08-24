@@ -847,32 +847,33 @@ class CloudFoundry(Cloud):
 
         self._get_started_apps(force_deploy)
 
-        cold_routes=self._get_routes(app_name=self.config.project_name, cold_routes=True)
-
-        for route in cold_routes:
-            # _self.unmap_route()
-            print(route.apps)
-            print(route.host)
-            for app in route.apps:
-                self._unmap_route(app=app,domain=route.domain,host=route.host,route_path=route.path)
-
         if manifest is None:
             manifest = self._determine_manifests()
+
+        # if blue/green, unmap any cold routes that exist
+        if blue_green:
+            cold_routes=self._get_routes(app_name=self.config.project_name, cold_routes=True)
+
+            for route in cold_routes:
+                # _self.unmap_route()
+                print(route.apps)
+                print(route.host)
+                for app in route.apps:
+                    self._unmap_route(app=app,domain=route.domain,host=route.host,route_path=route.path)
         
-        self._cf_push(manifest, True)
+        self._cf_push(manifest, blue_green)
 
-        hot_routes = self._get_routes(app_name=self.config.project_name, app_version=self.config.version_number)
+        # if blue/green, map cold routes, unmap hot routes and start new app
+        if blue_green:
+            hot_routes = self._get_routes(app_name=self.config.project_name, app_version=self.config.version_number)
 
-        for route in hot_routes:
-            print(route.apps)
-            print(route.host)
-            self._map_route(app="{app}-{version}".format(app=self.config.project_name, version=self.config.version_number),domain=route.domain, host=route.host, route_path="{}/cold".format(route.path if route.path is not None else "")) 
-            self._unmap_route(app="{app}-{version}".format(app=self.config.project_name, version=self.config.version_number),domain=route.domain, host=route.host, route_path=route.path) 
-        #self._cf_push(manifest, blue_green)
+            for route in hot_routes:
+                print(route.apps)
+                print(route.host)
+                self._map_route(app="{app}-{version}".format(app=self.config.project_name, version=self.config.version_number),domain=route.domain, host=route.host, route_path="{}/cold".format(route.path if route.path is not None else "")) 
+                self._unmap_route(app="{app}-{version}".format(app=self.config.project_name, version=self.config.version_number),domain=route.domain, host=route.host, route_path=route.path) 
 
-        self._start_app("{app}-{version}".format(app=self.config.project_name, version=self.config.version_number))
-        #if blue_green:
-        #    self._change_route_to_cold_route()
+            self._start_app("{app}-{version}".format(app=self.config.project_name, version=self.config.version_number))
 
         if not os.getenv("AUTO_STOP"):
             self._stop_old_app_servers()
