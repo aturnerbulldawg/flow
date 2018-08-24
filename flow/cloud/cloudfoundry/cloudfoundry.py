@@ -848,7 +848,7 @@ class CloudFoundry(Cloud):
 
         for route in cold_routes:
             for app in route.apps:
-                self._map_route(app=app,domain=route.domain, host=route.host, route_path=path.replace('/cold','')) 
+                self._map_route(app=app,domain=route.domain, host=route.host, route_path=route.path.replace('/cold','')) 
                 self._unmap_route(app=app,domain=route.domain,host=route.host,route_path=route.path)
         
                 self._restart_app(app)
