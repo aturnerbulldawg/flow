@@ -858,6 +858,8 @@ class CloudFoundry(Cloud):
 
         if manifest is None:
             manifest = self._determine_manifests()
+        
+        self._cf_push(manifest, True)
 
         hot_routes = self._get_routes(app_name=self.config.project_name, app_version=self.config.version_number)
 
@@ -865,19 +867,20 @@ class CloudFoundry(Cloud):
             print(route.apps)
             print(route.host)
             self._map_route(app="{app}-{version}".format(app=self.config.project_name, version=self.config.version_number),domain=route.domain, host=route.host, route_path="{}/cold".format(route.path if route.path is not None else "")) 
+            self._unmap_route(app="{app}-{version}".format(app=self.config.project_name, version=self.config.version_number),domain=route.domain, host=route.host, route_path=route.path) 
         #self._cf_push(manifest, blue_green)
 
         #if blue_green:
         #    self._change_route_to_cold_route()
 
-        #if not os.getenv("AUTO_STOP"):
-        #    self._stop_old_app_servers()
+        if not os.getenv("AUTO_STOP"):
+            self._stop_old_app_servers()
 
-        #if not force_deploy:
+        if not force_deploy:
             # don't delete if force bc we want to ensure that there is always 1 non-started instance
             # for backup and force_deploy is used when you need to redeploy/replace an instance
             # that is currently running
-        #    self._unmap_delete_previous_versions()
+            self._unmap_delete_previous_versions()
 
         commons.print_msg(CloudFoundry.clazz, method, 'DEPLOYMENT SUCCESSFUL')
 
