@@ -210,7 +210,7 @@ def main():
         cf = CloudFoundry()
 
         is_script_run_successful = True
-
+        
         if 'script' in args and args.script is not None:
             commons.print_msg(clazz, method, 'Custom deploy script detected')
             cf.download_cf_cli()
@@ -244,7 +244,10 @@ def main():
                 commons.print_msg(clazz, method, "Setting manifest to {}".format(args.manifest))
                 manifest = args.manifest
 
-            cf.deploy(force_deploy=force, manifest=manifest)
+            if args.action == 'upload':
+                cf.deploy(force_deploy=force, manifest=manifest)
+            elif args.action =='bluegreen':
+                cf.deploy(force_deploy=force, manifest=manifest, blue_green=True)
 
         commons.print_msg(clazz, method, 'Checking if we can attach the output to the CR')
 
