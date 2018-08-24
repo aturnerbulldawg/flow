@@ -829,6 +829,29 @@ class CloudFoundry(Cloud):
 
         return routes
 
+    def promote(self):
+        method = 'promote'
+        commons.print_msg(CloudFoundry.clazz, method, 'begin')
+
+        self._verify_required_attributes()
+
+        self.download_cf_cli()
+
+        self._cf_login_check()
+
+        self._cf_login()
+
+        self._check_cf_version()
+        
+        cold_routes=self._get_routes(app_name=self.config.project_name, cold_routes=True)
+
+        for route in cold_routes:
+            for app in route.apps:
+                self._map_route(app=app,domain=route.domain, host=route.host, route_path=path.replace('/cold','')) 
+                self._unmap_route(app=app,domain=route.domain,host=route.host,route_path=route.path)
+        
+        self._restart_app(app)
+        
     def deploy(self, force_deploy=False, manifest=None, blue_green=False):
         method = 'deploy'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
@@ -893,6 +916,33 @@ class CloudFoundry(Cloud):
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
 
         cmd = "{path}cf start {app_name}".format(path=CloudFoundry.path_to_cf, app_name=app)
+        cf_start = subprocess.Popen(cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        try:
+            cf_start_output, errs = cf_start.communicate(timeout=30)
+
+            if cf_start.returncode != 0:
+                commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return code of {rtn}".format(
+                    command=cmd, rtn=cf_start.returncode), 'ERROR')
+
+                os.system('stty sane')
+                self._cf_logout()
+                exit(1)
+
+        except TimeoutExpired:
+            commons.print_msg(CloudFoundry.clazz, method, "Timed out calling {}".format(cmd), 'ERROR')
+            cf_start.kill()
+            os.system('stty sane')
+            self._cf_logout()
+            exit(1)
+
+        commons.print_msg(CloudFoundry.clazz, method, 'end')
+        
+    def _restart_app(self, app):
+        method = '_restart_app'
+        commons.print_msg(CloudFoundry.clazz, method, 'begin')
+
+        cmd = "{path}cf restart {app_name}".format(path=CloudFoundry.path_to_cf, app_name=app)
         cf_start = subprocess.Popen(cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         try:
