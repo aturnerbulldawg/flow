@@ -798,7 +798,7 @@ class CloudFoundry(Cloud):
         filtered_applications = subprocess.Popen(filtered_application_cmd.split(), stdin=all_routes.stdout,
                                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         if cold_routes:
-            filter_cold_routes_cmd = "grep \-cold"
+            filter_cold_routes_cmd = "grep \\cold"
             filtered_applications_cold = subprocess.Popen(filter_cold_routes_cmd.split(), stdin=filtered_applications.stdout, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
             existing_routes_output, err = filtered_applications_cold.communicate(timeout=120)
