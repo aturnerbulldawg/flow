@@ -244,7 +244,7 @@ def main():
                 commons.print_msg(clazz, method, "Setting manifest to {}".format(args.manifest))
                 manifest = args.manifest
 
-            if args.action == 'upload':
+            if args.action == 'deploy':
                 cf.deploy(force_deploy=force, manifest=manifest)
             elif args.action =='bluegreen':
                 cf.deploy(force_deploy=force, manifest=manifest, blue_green=True)
