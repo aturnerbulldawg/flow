@@ -770,11 +770,11 @@ class CloudFoundry(Cloud):
             self._cf_logout()
             exit(1)
 
-    def _get_routes(self, app_name, app_version):
+    def _get_routes(self, app_name=None, app_version=None, cold_routes=False):
         method = '_get_routes'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
 
-        all_routes_cmd = "{}cf routes".format("")
+        all_routes_cmd = "{path}cf routes".format(path=CloudFoundry.path_to_cf)
         all_routes = subprocess.Popen(all_routes_cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         existing_routes_output, err = all_routes.communicate(timeout=120)
         route_header = existing_routes_output.splitlines()[2].decode("utf-8")
@@ -788,14 +788,21 @@ class CloudFoundry(Cloud):
         apps_pos = route_header.index('apps')
         service_pos = route_header.index('service')
 
-        all_routes_cmd = "{}cf routes".format("")
+        all_routes_cmd = "{path}cf routes".format(path=CloudFoundry.path_to_cf)
         app_search_string = "{app}{version}".format(app="{}-".format(app_name) if app_name is not None else "",
                                                     version=app_version if app_version is not None else "")
         filtered_application_cmd = "grep {}".format(app_search_string)
         all_routes = subprocess.Popen(all_routes_cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         filtered_applications = subprocess.Popen(filtered_application_cmd.split(), stdin=all_routes.stdout,
                                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        existing_routes_output, err = filtered_applications.communicate(timeout=120)
+        if cold_routes:
+            filter_cold_routes_cmd = "grep \-cold"
+            filtered_applications_cold = subprocess.Popen(filter_cold_routes_cmd.split(), stdin=filtered_applications.stdout, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+            existing_routes_output, err = filtered_applications_cold.communicate(timeout=120)
+        else:
+            existing_routes_output, err = filtered_applications.communicate(timeout=120)
+        
         routes = []
 
         for route_line in existing_routes_output.splitlines():
@@ -830,24 +837,24 @@ class CloudFoundry(Cloud):
 
         self._get_started_apps(force_deploy)
 
-        self._get_routes(self.config.project_name)
+        self._get_routes(app_name=self.config.project_name, cold_routes=True)
 
         if manifest is None:
             manifest = self._determine_manifests()
 
-        self._cf_push(manifest, blue_green)
+        #self._cf_push(manifest, blue_green)
 
-        if blue_green:
-            self._change_route_to_cold_route()
+        #if blue_green:
+        #    self._change_route_to_cold_route()
 
-        if not os.getenv("AUTO_STOP"):
-            self._stop_old_app_servers()
+        #if not os.getenv("AUTO_STOP"):
+        #    self._stop_old_app_servers()
 
-        if not force_deploy:
+        #if not force_deploy:
             # don't delete if force bc we want to ensure that there is always 1 non-started instance
             # for backup and force_deploy is used when you need to redeploy/replace an instance
             # that is currently running
-            self._unmap_delete_previous_versions()
+        #    self._unmap_delete_previous_versions()
 
         commons.print_msg(CloudFoundry.clazz, method, 'DEPLOYMENT SUCCESSFUL')
 
