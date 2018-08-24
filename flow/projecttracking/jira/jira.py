@@ -162,7 +162,7 @@ class Jira(Project_Tracking):
 
         try:
             # TODO: Remove auth from below...
-            resp = requests.post(jira_url, new_version.to_JSON(), headers=headers, auth=('admin', 'admin'), timeout=self.http_timeout)
+            resp = requests.post(jira_url, new_version.to_JSON(), headers=headers, auth=(os.getenv('JIRA_USER'), os.getenv('JIRA_PWD')), timeout=self.http_timeout)
 
             if resp.status_code != 201:
                 commons.print_msg(Jira.clazz, method, "Unable to add version {version} \r\n "
@@ -207,7 +207,7 @@ class Jira(Project_Tracking):
 
         try:
             # TODO: Remove auth from below...
-            resp = requests.put(jira_url, add_version_story.to_JSON(), auth=("admin", "admin"), headers=headers, timeout=self.http_timeout)
+            resp = requests.put(jira_url, add_version_story.to_JSON(), auth=(os.getenv('JIRA_USER'), os.getenv('JIRA_PWD')), headers=headers, timeout=self.http_timeout)
 
             if resp.status_code != 204:
                 commons.print_msg(Jira.clazz, method, "Unable to tag story {story} with label {lbl} \r\n "

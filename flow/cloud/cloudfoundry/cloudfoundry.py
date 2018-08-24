@@ -134,6 +134,7 @@ class CloudFoundry(Cloud):
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
+    # sets list of applications already stopped upon entering
     def _get_stopped_apps(self):
         method = '_get_stopped_apps'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
@@ -148,9 +149,6 @@ class CloudFoundry(Cloud):
 
         try:
             CloudFoundry.stopped_apps, errs = stopped_apps.communicate(timeout=60)
-
-            for line in CloudFoundry.stopped_apps.splitlines():
-                commons.print_msg(CloudFoundry.clazz, method, "App Already Stopped: {}".format(line.decode('utf-8')))
 
             if stopped_apps.returncode != 0:
                 commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return code of {rtn}".format(
@@ -169,6 +167,10 @@ class CloudFoundry(Cloud):
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
+    # sets list of started applications
+    # additionally, if the version being deployed is found and already started, it either
+    #    - warns the user that zero-downtime cannot occur (if force_deploy is True) OR
+    #    - errors to the user that it cannot continue with zero downtime (if force_deploy is False)
     def _get_started_apps(self, force_deploy=False):
         method = '_get_started_apps'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
@@ -184,10 +186,10 @@ class CloudFoundry(Cloud):
         try:
             CloudFoundry.started_apps, errs = started_apps.communicate(timeout=60)
 
+            version_to_look_for = "{proj}-{ver}".format(proj=self.config.project_name, ver=self.config.version_number)
+
             for line in CloudFoundry.started_apps.splitlines():
                 commons.print_msg(CloudFoundry.clazz, method, "Started App: {}".format(line.decode('utf-8')))
-                version_to_look_for = "{proj}-{ver}".format(proj=self.config.project_name,
-                                                            ver=self.config.version_number)
 
                 if line.decode('utf-8') == version_to_look_for and not force_deploy:
                     commons.print_msg(CloudFoundry.clazz, method, "App version {} already exists and is running. "
@@ -241,7 +243,7 @@ class CloudFoundry(Cloud):
 
         return manifest
 
-    def _cf_push(self, manifest):
+    def _cf_push(self, manifest, blue_green):
         method = '_cf_push'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
 
@@ -256,11 +258,14 @@ class CloudFoundry(Cloud):
 
         buildpack = "-b {}".format(os.getenv('CF_BUILDPACK')) if os.getenv('CF_BUILDPACK') else ""
 
-        cmd = CloudFoundry.path_to_cf + "cf push {project_name}-{version} -p {pushlocation} -f {manifest} {buildpack} ".format(project_name=self.config.project_name,
+        nostart = "--no-start" if blue_green else ""
+
+        cmd = CloudFoundry.path_to_cf + "cf push {project_name}-{version} -p {pushlocation} -f {manifest} {buildpack} {nostart}".format(project_name=self.config.project_name,
                                             version=self.config.version_number,
                                             pushlocation=file_to_push,
                                             manifest=manifest,
-                                            buildpack=buildpack)
+                                            buildpack=buildpack,
+                                            nostart=nostart)
 
         commons.print_msg(CloudFoundry.clazz, method, cmd.split())
         cf_push = subprocess.Popen(cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -566,7 +571,7 @@ class CloudFoundry(Cloud):
         method = 'cf_login_check'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
 
-        cmd_api = "{path}cf api {api}".format(path=CloudFoundry.path_to_cf,
+        cmd_api = "{path}cf api {api} --skip-ssl-validation".format(path=CloudFoundry.path_to_cf,
                                           api=CloudFoundry.cf_api_endpoint)
 
         cf_api = subprocess.Popen(cmd_api.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -634,7 +639,138 @@ class CloudFoundry(Cloud):
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
-    def deploy(self, force_deploy=False, manifest=None):
+    def _change_route_to_cold_route(self):
+        method = '_change_route_to_cold_route'
+        commons.print_msg(CloudFoundry.clazz, method, 'begin')
+        #
+        # # cmd = "{path}cf routes | grep {app} | awk '{{print $1}}'".format(path=CloudFoundry.path_to_cf,
+        # #                                                                  app=self.config.project_name + '-' + self.config.version_number)
+        #
+        #
+        # cmd = "{path}cf app {app} | grep routes: | cut -d" " -f2-".format( path=CloudFoundry.path_to_cf,
+        #                                                                   app=self.config.project_name + '-' + self.config.version_number)
+        #
+        # routes_to_make_cold = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)  # nosec
+        #
+        # make_cold_routes_failed = False
+        #
+        # try:
+        #     routes_to_make_cold_output, errs = routes_to_make_cold.communicate(timeout=30)
+        #
+        #     for line in routes_to_make_cold_output.splitlines():
+        #         commons.print_msg(CloudFoundry.clazz, method, line.decode('utf-8'))
+        #
+        #         if '-cold' not in line.decode('utf-8'):
+        #
+        #     if cf_logout.returncode != 0:
+        #         commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return code of {rtn}"
+        #                           .format(command=cmd,
+        #                                   rtn=cf_logout.returncode),
+        #                           'ERROR')
+        #         logout_failed = True
+        #
+        #
+        #     CloudFoundry.stopped_apps, errs = stopped_apps.communicate(timeout=60)
+        #
+        #     delete_app = subprocess.Popen(delete_cmd.split(), shell=False, stdout=subprocess.PIPE,
+        #                                   stderr=subprocess.STDOUT)
+        #
+        #     try:
+        #         delete_app_output, errs = delete_app.communicate(timeout=120)
+        #     if stopped_apps.returncode != 0:
+        #         commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return code of {rtn}".format(
+        #             command=cmd, rtn=stopped_apps.returncode), 'ERROR')
+        #         get_stopped_apps_failed = True
+        # # get routes for application
+        #
+        # # loop through routes
+        #
+        #     # add new routes but with -cold
+        #
+        # # get routes for application
+        #
+        #     # unmap non-cold routes
+
+    def _map_route(self, app, domain, host=None, route_path=None):
+        method = '_map_route'
+        commons.print_msg(CloudFoundry.clazz, method, 'begin')
+
+        cmd = "{path}cf map-route {app} {cf_domain} {route_path}".format(
+            path=CloudFoundry.path_to_cf,
+            app=app,
+            cf_domain=domain,
+            host="--hostname {}".format(host) if host is not None else "",
+            route_path="--path {}".format(route_path) if route_path is not None else "")
+
+        commons.print_msg(CloudFoundry.clazz, method, cmd)
+
+        map_route = subprocess.Popen(cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        map_route_failed = False
+
+        try:
+            map_route_output, errs = map_route.communicate(timeout=120)
+
+            for mapped_route in map_route_output.splitlines():
+                commons.print_msg(CloudFoundry.clazz, method, mapped_route.decode("utf-8"))
+
+            if map_route.returncode != 0:
+                map_route_failed = True
+                commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return "
+                                                              "code of {rtn}".format(command=cmd,
+                                                                                     rtn=map_route.returncode),
+                                  'ERROR')
+
+        except TimeoutExpired:
+            map_route_failed = True
+            commons.print_msg(CloudFoundry.clazz, method, "Timed out calling {}".format(cmd), 'ERROR')
+
+        if map_route_failed:
+            os.system('stty sane')
+            self._cf_logout()
+            exit(1)
+
+    def _unmap_route(self, app, domain, host=None, route_path=None):
+        method = '_unmap_route'
+        commons.print_msg(CloudFoundry.clazz, method, 'begin')
+
+        cmd = "{path}cf unmap-route {app} {cf_domain} {route_path}".format(
+            path=CloudFoundry.path_to_cf,
+            app=app,
+            cf_domain=domain,
+            host="--hostname {}".format(host) if host is not None else "",
+            route_path = "--path {}".format(route_path) if route_path is not None else "")
+
+        commons.print_msg(CloudFoundry.clazz, method, cmd)
+
+        unmap_route = subprocess.Popen(cmd.split(), shell=False, stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT)
+
+        unmap_delete_previous_versions_failed = False
+
+        try:
+            unmap_route_output, errs = unmap_route.communicate(timeout=120)
+
+            for unmapped_route in unmap_route_output.splitlines():
+                commons.print_msg(CloudFoundry.clazz, method, unmapped_route.decode("utf-8"))
+
+            if unmap_route.returncode != 0:
+                unmap_delete_previous_versions_failed = True
+                commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return "
+                                                              "code of {rtn}".format( command=cmd,
+                                                                                      rtn=unmap_route.returncode),
+                                  'ERROR')
+
+        except TimeoutExpired:
+            unmap_delete_previous_versions_failed = True
+            commons.print_msg(CloudFoundry.clazz, method, "Timed out calling {}".format(cmd), 'ERROR')
+
+        if unmap_delete_previous_versions_failed:
+            os.system('stty sane')
+            self._cf_logout()
+            exit(1)
+
+    def deploy(self, force_deploy=False, manifest=None, blue_green=False):
         method = 'deploy'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
 
@@ -655,7 +791,10 @@ class CloudFoundry(Cloud):
         if manifest is None:
             manifest = self._determine_manifests()
 
-        self._cf_push(manifest)
+        self._cf_push(manifest, blue_green)
+
+        if blue_green:
+            self._change_route_to_cold_route()
 
         if not os.getenv("AUTO_STOP"):
             self._stop_old_app_servers()
