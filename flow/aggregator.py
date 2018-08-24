@@ -209,55 +209,63 @@ def main():
 
         cf = CloudFoundry()
 
-        is_script_run_successful = True
-        
-        if 'script' in args and args.script is not None:
-            commons.print_msg(clazz, method, 'Custom deploy script detected')
-            cf.download_cf_cli()
-            cf.download_custom_deployment_script(args.script)
-            is_script_run_successful = cf.run_deployment_script(args.script)
+        if args.action == 'promote':
+            cf.promote()
+            
+            # noinspection PyPep8Naming
+            SIGNAL = 'publish-promote-complete'
+            sender = {}
+            dispatcher.send(signal=SIGNAL, sender=sender)
         else:
-            commons.print_msg(clazz, method, 'No custom deploy script passed in.  Cloud Foundry detected in '
-                                             'buildConfig.  Calling standard CloudFoundry deployment.')
+            is_script_run_successful = True
 
-            # TODO make this configurable in case they are using
-            create_deployment_directory()
-
-            if BuildConfig.artifact_extension is None and BuildConfig.artifact_extensions is None:
-                commons.print_msg(clazz, method, 'Attempting to retrieve and deploy from GitHub.')
-
-                github.download_code_at_version()
+            if 'script' in args and args.script is not None:
+                commons.print_msg(clazz, method, 'Custom deploy script detected')
+                cf.download_cf_cli()
+                cf.download_custom_deployment_script(args.script)
+                is_script_run_successful = cf.run_deployment_script(args.script)
             else:
-                commons.print_msg(clazz, method, 'Attempting to retrieve and deploy from Artifactory.')
-                artifactory = Artifactory()
+                commons.print_msg(clazz, method, 'No custom deploy script passed in.  Cloud Foundry detected in '
+                                                 'buildConfig.  Calling standard CloudFoundry deployment.')
 
-                artifactory.download_and_extract_artifacts_locally(BuildConfig.push_location + '/')
+                # TODO make this configurable in case they are using
+                create_deployment_directory()
 
-            force = False
+                if BuildConfig.artifact_extension is None and BuildConfig.artifact_extensions is None:
+                    commons.print_msg(clazz, method, 'Attempting to retrieve and deploy from GitHub.')
 
-            if 'force' in args and args.force is not None and args.force.strip().lower() != 'false':
-                force = True
+                    github.download_code_at_version()
+                else:
+                    commons.print_msg(clazz, method, 'Attempting to retrieve and deploy from Artifactory.')
+                    artifactory = Artifactory()
 
-            manifest = None
+                    artifactory.download_and_extract_artifacts_locally(BuildConfig.push_location + '/')
 
-            if 'manifest' in args and args.manifest is not None:
-                commons.print_msg(clazz, method, "Setting manifest to {}".format(args.manifest))
-                manifest = args.manifest
+                force = False
 
-            if args.action == 'deploy':
-                cf.deploy(force_deploy=force, manifest=manifest)
-            elif args.action =='bluegreen':
-                cf.deploy(force_deploy=force, manifest=manifest, blue_green=True)
+                if 'force' in args and args.force is not None and args.force.strip().lower() != 'false':
+                    force = True
 
-        commons.print_msg(clazz, method, 'Checking if we can attach the output to the CR')
+                manifest = None
 
-        # noinspection PyPep8Naming
-        SIGNAL = 'publish-deploy-complete'
-        sender = {}
-        dispatcher.send(signal=SIGNAL, sender=sender)
+                if 'manifest' in args and args.manifest is not None:
+                    commons.print_msg(clazz, method, "Setting manifest to {}".format(args.manifest))
+                    manifest = args.manifest
 
-        if is_script_run_successful is False:
-            exit(1)
+                if args.action == 'deploy':
+                    cf.deploy(force_deploy=force, manifest=manifest)
+                elif args.action =='bluegreen':
+                    cf.deploy(force_deploy=force, manifest=manifest, blue_green=True)
+
+            commons.print_msg(clazz, method, 'Checking if we can attach the output to the CR')
+
+            # noinspection PyPep8Naming
+            SIGNAL = 'publish-deploy-complete'
+            sender = {}
+            dispatcher.send(signal=SIGNAL, sender=sender)
+
+            if is_script_run_successful is False:
+                exit(1)
 
         metrics.write_metric(task, args.action)
     elif task == 'gcappengine':
