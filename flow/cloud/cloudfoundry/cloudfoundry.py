@@ -695,7 +695,7 @@ class CloudFoundry(Cloud):
         method = '_map_route'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
 
-        cmd = "{path}cf map-route {app} {cf_domain} {route_path}".format(
+        cmd = "{path}cf map-route {app} {cf_domain} {host} {route_path}".format(
             path=CloudFoundry.path_to_cf,
             app=app,
             cf_domain=domain,
@@ -733,8 +733,9 @@ class CloudFoundry(Cloud):
     def _unmap_route(self, app, domain, host=None, route_path=None):
         method = '_unmap_route'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
-
-        cmd = "{path}cf unmap-route {app} {cf_domain} {route_path}".format(
+        print('asdf')
+        print(host)
+        cmd = "{path}cf unmap-route {app} {cf_domain} {host} {route_path}".format(
             path=CloudFoundry.path_to_cf,
             app=app,
             cf_domain=domain,
@@ -807,9 +808,18 @@ class CloudFoundry(Cloud):
 
         for route_line in existing_routes_output.splitlines():
             route = commons.Object()
-            route.host = route_line.decode("utf-8")[host_pos:(domain_pos - 1)].rstrip()
+            route.apps = route_line.decode("utf-8")[apps_pos:(service_pos - 1)].rstrip().split(',')
+            host = route_line.decode("utf-8")[host_pos:(domain_pos - 1)].rstrip()
             route.domain = route_line.decode("utf-8")[domain_pos:(port_pos - 1)].rstrip()
-            route.path = route_line.decode("utf-8")[path_pos:(type_pos - 1)].rstrip()
+            path = route_line.decode("utf-8")[path_pos:(type_pos - 1)].rstrip()
+            if not path:
+                route.path = None
+            else: 
+                route.path = path
+            if not host:
+                route.host = None
+            else:
+                route.host = host
             routes.append(route)
 
         for route in routes:
@@ -837,7 +847,14 @@ class CloudFoundry(Cloud):
 
         self._get_started_apps(force_deploy)
 
-        self._get_routes(app_name=self.config.project_name, cold_routes=True)
+        cold_routes=self._get_routes(app_name=self.config.project_name, cold_routes=True)
+
+        for route in cold_routes:
+            # _self.unmap_route()
+            print(route.apps)
+            print(route.host)
+            for app in route.apps:
+                self._unmap_route(app=app,domain=route.domain,host=route.host,route_path=route.path)
 
         if manifest is None:
             manifest = self._determine_manifests()
