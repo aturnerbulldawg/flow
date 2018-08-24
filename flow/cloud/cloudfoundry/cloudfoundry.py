@@ -243,7 +243,7 @@ class CloudFoundry(Cloud):
 
         return manifest
 
-    def _cf_push(self, manifest, blue_green):
+    def _cf_push(self, manifest, blue_green=None):
         method = '_cf_push'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
 
@@ -770,6 +770,48 @@ class CloudFoundry(Cloud):
             self._cf_logout()
             exit(1)
 
+    def _get_routes(self, app_name, app_version):
+        method = '_get_routes'
+        commons.print_msg(CloudFoundry.clazz, method, 'begin')
+
+        all_routes_cmd = "{}cf routes".format("")
+        all_routes = subprocess.Popen(all_routes_cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        existing_routes_output, err = all_routes.communicate(timeout=120)
+        route_header = existing_routes_output.splitlines()[2].decode("utf-8")
+
+        space_pos = route_header.index('space')
+        host_pos = route_header.index('host')
+        domain_pos = route_header.index('domain')
+        port_pos = route_header.index('port')
+        path_pos = route_header.index('path')
+        type_pos = route_header.index('type')
+        apps_pos = route_header.index('apps')
+        service_pos = route_header.index('service')
+
+        all_routes_cmd = "{}cf routes".format("")
+        app_search_string = "{app}{version}".format(app="{}-".format(app_name) if app_name is not None else "",
+                                                    version=app_version if app_version is not None else "")
+        filtered_application_cmd = "grep {}".format(app_search_string)
+        all_routes = subprocess.Popen(all_routes_cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        filtered_applications = subprocess.Popen(filtered_application_cmd.split(), stdin=all_routes.stdout,
+                                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        existing_routes_output, err = filtered_applications.communicate(timeout=120)
+        routes = []
+
+        for route_line in existing_routes_output.splitlines():
+            route = commons.Object()
+            route.host = route_line.decode("utf-8")[host_pos:(domain_pos - 1)].rstrip()
+            route.domain = route_line.decode("utf-8")[domain_pos:(port_pos - 1)].rstrip()
+            route.path = route_line.decode("utf-8")[path_pos:(type_pos - 1)].rstrip()
+            routes.append(route)
+
+        for route in routes:
+            commons.print_msg(CloudFoundry.clazz, method, "{host}.{domain}/{path}".format(host=route.host,
+                                                                                          domain=route.domain,
+                                                                                          path=route.path))
+
+        return routes
+
     def deploy(self, force_deploy=False, manifest=None, blue_green=False):
         method = 'deploy'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
@@ -787,6 +829,8 @@ class CloudFoundry(Cloud):
         self._get_stopped_apps()
 
         self._get_started_apps(force_deploy)
+
+        self._get_routes(self.config.project_name)
 
         if manifest is None:
             manifest = self._determine_manifests()
