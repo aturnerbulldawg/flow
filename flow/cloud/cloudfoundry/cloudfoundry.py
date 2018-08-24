@@ -859,6 +859,12 @@ class CloudFoundry(Cloud):
         if manifest is None:
             manifest = self._determine_manifests()
 
+        hot_routes = self._get_routes(app_name=self.config.project_name, app_version=self.config.version_number)
+
+        for route in hot_routes:
+            print(route.apps)
+            print(route.host)
+            self._map_route(app="{app}-{version}".format(app=self.config.project_name, version=self.config.version_number),domain=route.domain, host=route.host, route_path="{}/cold".format(route.path if route.path is not None else "")) 
         #self._cf_push(manifest, blue_green)
 
         #if blue_green:
