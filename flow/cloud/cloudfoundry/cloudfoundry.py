@@ -112,7 +112,7 @@ class CloudFoundry(Cloud):
         cf_version = subprocess.Popen(cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         try:
-            cf_version_output, errs = cf_version.communicate(timeout=30)
+            cf_version_output, errs = cf_version.communicate(timeout=120)
 
             for line in cf_version_output.splitlines():
                 commons.print_msg(CloudFoundry.clazz, method, line.decode('utf-8'))
@@ -148,7 +148,7 @@ class CloudFoundry(Cloud):
         get_stopped_apps_failed = False
 
         try:
-            CloudFoundry.stopped_apps, errs = stopped_apps.communicate(timeout=60)
+            CloudFoundry.stopped_apps, errs = stopped_apps.communicate(timeout=120)
 
             if stopped_apps.returncode != 0:
                 commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return code of {rtn}".format(
@@ -184,7 +184,7 @@ class CloudFoundry(Cloud):
         get_started_apps_failed = False
 
         try:
-            CloudFoundry.started_apps, errs = started_apps.communicate(timeout=60)
+            CloudFoundry.started_apps, errs = started_apps.communicate(timeout=120)
 
             version_to_look_for = "{proj}-{ver}".format(proj=self.config.project_name, ver=self.config.version_number)
 
@@ -316,7 +316,7 @@ class CloudFoundry(Cloud):
                 cf_scale = subprocess.Popen(cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
                 try:
-                    cf_scale_output, errs = cf_scale.communicate(timeout=60)
+                    cf_scale_output, errs = cf_scale.communicate(timeout=120)
 
                     for scale_line in cf_scale_output.splitlines():
                         commons.print_msg(CloudFoundry.clazz, method, scale_line.decode('utf-8'))
@@ -338,7 +338,7 @@ class CloudFoundry(Cloud):
                 cf_stop = subprocess.Popen(stop_cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
                 try:
-                    cf_stop_output, errs = cf_stop.communicate(timeout=60)
+                    cf_stop_output, errs = cf_stop.communicate(timeout=120)
 
                     for stop_line in cf_stop_output.splitlines():
                         commons.print_msg(CloudFoundry.clazz, method, stop_line.decode("utf-8"))
@@ -481,7 +481,7 @@ class CloudFoundry(Cloud):
         logout_failed = False
 
         try:
-            cf_logout_output, errs = cf_logout.communicate(timeout=30)
+            cf_logout_output, errs = cf_logout.communicate(timeout=120)
 
             for line in cf_logout_output.splitlines():
                 commons.print_msg(CloudFoundry.clazz, method, line.decode('utf-8'))
@@ -577,7 +577,7 @@ class CloudFoundry(Cloud):
         cf_api = subprocess.Popen(cmd_api.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         try:
-            cf_api_output, cf_api_err = cf_api.communicate(timeout=30)
+            cf_api_output, cf_api_err = cf_api.communicate(timeout=120)
 
             for api_line in cf_api_output.splitlines():
                 commons.print_msg(CloudFoundry.clazz, method, api_line.decode('utf-8'))
@@ -598,7 +598,7 @@ class CloudFoundry(Cloud):
         cf_login = subprocess.Popen(cmd_auth.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         try:
-            cf_login_output, cf_login_err = cf_login.communicate(timeout=30)
+            cf_login_output, cf_login_err = cf_login.communicate(timeout=120)
 
             for cf_login_line in cf_login_output.splitlines():
                 commons.print_msg(CloudFoundry.clazz, method, cf_login_line.decode('utf-8'))
@@ -619,11 +619,10 @@ class CloudFoundry(Cloud):
         cmd_target_array.append("-s")
         cmd_target_array.append(CloudFoundry.cf_space)
         
-        print(cmd_target_array)
         cf_target = subprocess.Popen(cmd_target_array, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         try:
-            cf_target_output, cf_target_err = cf_target.communicate(timeout=30)
+            cf_target_output, cf_target_err = cf_target.communicate(timeout=120)
 
             for cf_target_line in cf_target_output.splitlines():
                 commons.print_msg(CloudFoundry.clazz, method, cf_target_line.decode('utf-8'))
@@ -733,8 +732,7 @@ class CloudFoundry(Cloud):
     def _unmap_route(self, app, domain, host=None, route_path=None):
         method = '_unmap_route'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
-        print('asdf')
-        print(host)
+
         cmd = "{path}cf unmap-route {app} {cf_domain} {host} {route_path}".format(
             path=CloudFoundry.path_to_cf,
             app=app,
@@ -790,7 +788,7 @@ class CloudFoundry(Cloud):
         service_pos = route_header.index('service')
 
         all_routes_cmd = "{path}cf routes".format(path=CloudFoundry.path_to_cf)
-        print(all_routes_cmd)
+
         app_search_string = "{app}{version}".format(app="{}-".format(app_name) if app_name is not None else "",
                                                     version=app_version if app_version is not None else "")
         filtered_application_cmd = "grep {}".format(app_search_string)
@@ -829,6 +827,28 @@ class CloudFoundry(Cloud):
                                                                                           path=route.path))
 
         return routes
+
+    def cutover(self):
+        method = 'cutover'
+        commons.print_msg(CloudFoundry.clazz, method, 'begin')
+
+        self._verify_required_attributes()
+
+        self.download_cf_cli()
+
+        self._cf_login_check()
+
+        self._cf_login()
+
+        self._check_cf_version()
+
+        self._get_stopped_apps()
+
+        self._get_started_apps(False)
+
+        self._stop_old_app_servers()
+
+        self._unmap_delete_previous_versions()
 
     def promote(self):
         method = 'promote'
@@ -881,8 +901,6 @@ class CloudFoundry(Cloud):
 
             for route in cold_routes:
                 # _self.unmap_route()
-                print(route.apps)
-                print(route.host)
                 for app in route.apps:
                     self._unmap_route(app=app,domain=route.domain,host=route.host,route_path=route.path)
         
@@ -893,14 +911,12 @@ class CloudFoundry(Cloud):
             hot_routes = self._get_routes(app_name=self.config.project_name, app_version=self.config.version_number)
 
             for route in hot_routes:
-                print(route.apps)
-                print(route.host)
-                self._map_route(app="{app}-{version}".format(app=self.config.project_name, version=self.config.version_number),domain=route.domain, host=route.host, route_path="{}/cold".format(route.path if route.path is not None else "")) 
+                self._map_route(app="{app}-{version}".format(app=self.config.project_name, version=self.config.version_number),domain=route.domain, host=route.host, route_path="{}/cold".format(route.path if route.path is not None else ""))
                 self._unmap_route(app="{app}-{version}".format(app=self.config.project_name, version=self.config.version_number),domain=route.domain, host=route.host, route_path=route.path) 
 
             self._start_app("{app}-{version}".format(app=self.config.project_name, version=self.config.version_number))
 
-        if not os.getenv("AUTO_STOP"):
+        if not blue_green and not os.getenv("AUTO_STOP"):
             self._stop_old_app_servers()
 
         if not force_deploy:
@@ -912,7 +928,7 @@ class CloudFoundry(Cloud):
         commons.print_msg(CloudFoundry.clazz, method, 'DEPLOYMENT SUCCESSFUL')
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
-        
+
     def _start_app(self, app):
         method = '_start_app'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
@@ -921,7 +937,7 @@ class CloudFoundry(Cloud):
         cf_start = subprocess.Popen(cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         try:
-            cf_start_output, errs = cf_start.communicate(timeout=30)
+            cf_start_output, errs = cf_start.communicate(timeout=120)
 
             if cf_start.returncode != 0:
                 commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return code of {rtn}".format(
@@ -948,7 +964,7 @@ class CloudFoundry(Cloud):
         cf_start = subprocess.Popen(cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         try:
-            cf_start_output, errs = cf_start.communicate(timeout=30)
+            cf_start_output, errs = cf_start.communicate(timeout=120)
 
             if cf_start.returncode != 0:
                 commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return code of {rtn}".format(

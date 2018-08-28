@@ -216,6 +216,13 @@ def main():
             SIGNAL = 'publish-promote-complete'
             sender = {}
             dispatcher.send(signal=SIGNAL, sender=sender)
+        elif args.action == 'cutover':
+            cf.cutover()
+
+            # noinspection PyPep8Naming
+            SIGNAL = 'publish-cutover-complete'
+            sender = {}
+            dispatcher.send(signal=SIGNAL, sender=sender)
         else:
             is_script_run_successful = True
 
