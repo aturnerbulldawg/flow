@@ -844,7 +844,7 @@ class CloudFoundry(Cloud):
 
         self._get_stopped_apps()
 
-        self._get_started_apps(False)
+        self._get_started_apps(True)
 
         self._stop_old_app_servers()
 
