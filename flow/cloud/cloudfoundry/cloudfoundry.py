@@ -919,7 +919,7 @@ class CloudFoundry(Cloud):
         if not blue_green and not os.getenv("AUTO_STOP"):
             self._stop_old_app_servers()
 
-        if not force_deploy:
+        if not blue_green and not force_deploy:
             # don't delete if force bc we want to ensure that there is always 1 non-started instance
             # for backup and force_deploy is used when you need to redeploy/replace an instance
             # that is currently running
