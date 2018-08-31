@@ -45,7 +45,7 @@ class ServiceNow():
         cr = Object()
         cr.category = "Software"
         cr.description = self._format_release_notes(story_details)
-        cr.short_description = "Automated Deploy of {app}-{version} to {env}".format(app=BuildConfig.project_name, version=BuildConfig.version_number, env=os.getenv('NEXT_ENVIRONMENT'))
+        cr.short_description = "Deployment of {app}-{version} to {env}".format(app=BuildConfig.project_name, version=BuildConfig.version_number, env=os.getenv('NEXT_ENVIRONMENT'))
         cr.assignment_group = 'CAB Approval'
         cr.work_start = '2018-08-10 23:59:59'
         cr.work_end = '2018-08-11 23:59:59'
