@@ -2,13 +2,19 @@ import os
 import subprocess
 import tarfile
 import urllib.request
+import requests
+import json
+
+import logging, http.client as http_client
+
 from subprocess import TimeoutExpired
 import platform
 
 from flow.buildconfig import BuildConfig
 from flow.cloud.cloud_abc import Cloud
-
+from requests.auth import HTTPBasicAuth
 import flow.utils.commons as commons
+from flow.utils.commons import Object
 
 
 class CloudFoundry(Cloud):
@@ -25,6 +31,10 @@ class CloudFoundry(Cloud):
     started_apps = None
     config = BuildConfig
     http_timeout = 30
+    api_token = None
+    space_guid = None
+    cf_api_login_endpoint = None
+
 
     def __init__(self, config_override=None):
         method = '__init__'
@@ -40,6 +50,51 @@ class CloudFoundry(Cloud):
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
+    def api_login(self):
+        method = '_api_login'
+
+        #TODO Remove this
+        CloudFoundry.cf_api_login_endpoint = 'login.sys.fog.onefiserv.net'
+
+        self._verify_required_attributes()
+
+        payload = {'grant_type': 'password', 'password': CloudFoundry.cf_pwd,
+                   'username': CloudFoundry.cf_user}
+
+        pcf_login_headers = {'Content-type': 'application/x-www-form-urlencoded',
+                             'Host': CloudFoundry.cf_api_login_endpoint, 'username': CloudFoundry.cf_user}
+
+        login_url = "https://{}/oauth/token".format(CloudFoundry.cf_api_login_endpoint)
+
+        try:
+            resp = requests.post(login_url, auth=HTTPBasicAuth('cf', ''), params=payload,
+                                 headers=pcf_login_headers, verify=False)
+            json_data = json.loads(resp.text)
+
+            CloudFoundry.api_token = json_data['access_token']
+        except requests.ConnectionError:
+                commons.print_msg(CloudFoundry.clazz, method, 'Request to Cloud Foundry timed out.', 'ERROR')
+                exit(1)
+        except:
+            commons.print_msg(CloudFoundry.clazz, method, "The cloud foundry api login call to {} has failed".
+                              format(CloudFoundry.cf_api_login_endpoint), 'ERROR')
+            exit(1)
+
+        if CloudFoundry.api_token is None:
+            commons.print_msg(CloudFoundry.clazz, method, 'Failed to find API token', 'ERROR')
+            exit(1)
+
+        self._get_space_guid()
+
+        self._get_stopped_apps()
+
+        self._get_started_apps()
+
+        self._unmap_delete_previous_versions()
+
+        self._stop_old_app_servers()
+
+        commons.print_msg(CloudFoundry.clazz, method, 'end')
 
     def download_cf_cli(self):
         method = '_download_cf_cli'
@@ -61,6 +116,45 @@ class CloudFoundry(Cloud):
             CloudFoundry.path_to_cf = "./"
             tar.extractall()
             tar.close()
+
+        commons.print_msg(CloudFoundry.clazz, method, 'end')
+
+    def _get_space_guid(self):
+        method = '_get_space_guid'
+        commons.print_msg(CloudFoundry.clazz, method, 'begin')
+
+        #TODO Remove this
+        CloudFoundry.cf_space = 'ro-test'
+
+        bearer_token = "bearer {access_token}".format(access_token=CloudFoundry.api_token)
+
+        pcf_spaces_headers = {'Authorization': bearer_token}
+
+        spaces_url = "https://{api}/v2/spaces".format(api=CloudFoundry.cf_api_endpoint)
+
+        try:
+            resp = requests.get(spaces_url, headers=pcf_spaces_headers, verify=False)
+        except requests.ConnectionError:
+            commons.print_msg(CloudFoundry.clazz, method, 'Request to Cloud Foundry timed out.', 'ERROR')
+            exit(1)
+        except:
+            commons.print_msg(CloudFoundry.clazz, method, "The cloud foundry api get spaces call failed. {}".
+                              format(spaces_url), 'ERROR')
+            exit(1)
+
+        json_data = json.loads(resp.text)
+
+        # Since this URL gets all spaces, we are looking only for the one that we need
+        for i, app in enumerate(json_data['resources']):
+            if app['entity']['name'] in CloudFoundry.cf_space:
+                CloudFoundry.space_guid = app['metadata']['guid']
+                break
+
+        if CloudFoundry.space_guid is None:
+            commons.print_msg(CloudFoundry.clazz, method, 'Failed to find space', 'ERROR')
+            exit(1)
+
+        commons.print_msg(CloudFoundry.clazz, method, "space guid is {}".format(CloudFoundry.space_guid))
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
@@ -134,36 +228,43 @@ class CloudFoundry(Cloud):
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
-    # sets list of applications already stopped upon entering
     def _get_stopped_apps(self):
         method = '_get_stopped_apps'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
 
-        cmd = "{path}cf apps | grep {proj}*-v\d*\.\d*\.\d* | grep stopped | awk '{{print $1}}'".format(
-            path=CloudFoundry.path_to_cf,
-            proj=self.config.project_name)
+        bearer_token = "bearer {access_token}".format(access_token=self.api_token)
 
-        stopped_apps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) # nosec
+        pcf_apps_headers = {'Authorization': bearer_token}
 
-        get_stopped_apps_failed = False
+        apps_url = "https://{api}/v2/spaces/{space_guid}/apps".format(api=CloudFoundry.cf_api_endpoint,
+                                                                      space_guid=CloudFoundry.space_guid)
+
+        stopped_apps = []
 
         try:
-            CloudFoundry.stopped_apps, errs = stopped_apps.communicate(timeout=120)
-
-            if stopped_apps.returncode != 0:
-                commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return code of {rtn}".format(
-                    command=cmd, rtn=stopped_apps.returncode), 'ERROR')
-                get_stopped_apps_failed = True
-
-        except TimeoutExpired:
-            commons.print_msg(CloudFoundry.clazz, method, "Timed out calling {}".format(cmd), 'ERROR')
-            get_stopped_apps_failed = True
-
-        if get_stopped_apps_failed:
-            stopped_apps.kill()
-            os.system('stty sane')
-            self._cf_logout()
+            resp = requests.get(apps_url, headers=pcf_apps_headers, verify=False)
+        except requests.ConnectionError:
+            commons.print_msg(CloudFoundry.clazz, method, 'Request to Cloud Foundry timed out.', 'ERROR')
             exit(1)
+        except:
+            commons.print_msg(CloudFoundry.clazz, method, "The cloud foundry get stopped apps has failed {}".
+                              format(apps_url), 'ERROR')
+            exit(1)
+
+        json_data = json.loads(resp.text)
+
+        for i, app in enumerate(json_data['resources']):
+            print(app['entity']['name'].lower())
+            if app['entity']['name'].lower().startswith(self.config.project_name.lower()) \
+                    and app['entity']['state'].lower() == 'stopped':
+                app_obj = Object()
+                app_obj.name = app['entity']['name']
+                app_obj.guid = app['metadata']['guid']
+                stopped_apps.append(app_obj)
+
+        commons.print_msg(CloudFoundry.clazz, method, "found {} stopped apps".format(len(stopped_apps)))
+
+        CloudFoundry.stopped_apps = stopped_apps
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
@@ -175,49 +276,56 @@ class CloudFoundry(Cloud):
         method = '_get_started_apps'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
 
-        cmd = "{path}cf apps | grep {proj}*-v\d*\.\d*\.\d* | grep started | awk '{{print $1}}'".format(
-            path=CloudFoundry.path_to_cf,
-            proj=self.config.project_name)
+        bearer_token = "bearer {access_token}".format(access_token=self.api_token)
 
-        started_apps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) # nosec
+        pcf_apps_headers = {'Authorization': bearer_token}
 
-        get_started_apps_failed = False
+        apps_url = "https://{api}/v2/spaces/{space_guid}/apps".format(api=CloudFoundry.cf_api_endpoint,
+                                                                      space_guid=CloudFoundry.space_guid)
+        started_apps = []
+
+        version_to_look_for = "{proj}-{ver}".format(proj=self.config.project_name.lower(), ver=self.config.version_number)
 
         try:
-            CloudFoundry.started_apps, errs = started_apps.communicate(timeout=120)
-
-            version_to_look_for = "{proj}-{ver}".format(proj=self.config.project_name, ver=self.config.version_number)
-
-            for line in CloudFoundry.started_apps.splitlines():
-                commons.print_msg(CloudFoundry.clazz, method, "Started App: {}".format(line.decode('utf-8')))
-
-                if line.decode('utf-8') == version_to_look_for and not force_deploy:
-                    commons.print_msg(CloudFoundry.clazz, method, "App version {} already exists and is running. "
-                                                                 "Cannot perform zero-downtime deployment.  To "
-                                                                 "override, set force flag = 'true'".format(
-                        version_to_look_for), 'ERROR')
-                    get_started_apps_failed = True
-
-                elif line.decode('utf-8') == version_to_look_for and force_deploy:
-                    commons.print_msg(CloudFoundry.clazz, method, "Already found {} but force_deploy turned on. "
-                                                                 "Continuing with deployment.  Downtime will occur "
-                                                                 "during deployment.".format(version_to_look_for))
-            if started_apps.returncode != 0:
-                commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return code of {rtn}".format(
-                    command=cmd, rtn=started_apps.returncode), 'ERROR')
-
-                get_started_apps_failed = True
-
-        except TimeoutExpired:
-            commons.print_msg(CloudFoundry.clazz, method, "Timed out calling {}".format(cmd), 'ERROR')
-            get_started_apps_failed = True
-
-        if get_started_apps_failed:
-            started_apps.kill()
-            # started_apps.communicate()
-            os.system('stty sane')
+            resp = requests.get(apps_url, headers=pcf_apps_headers, verify=False)
+        except requests.ConnectionError:
+            commons.print_msg(CloudFoundry.clazz, method, 'Request to Cloud Foundry timed out.', 'ERROR')
             self._cf_logout()
             exit(1)
+        except:
+            commons.print_msg(CloudFoundry.clazz, method, "The cloud foundry api login call failed to {} has failed".
+                              format(apps_url), 'ERROR')
+            self._cf_logout()
+            exit(1)
+
+        json_data = json.loads(resp.text)
+
+        for i, app in enumerate(json_data['resources']):
+            if app['entity']['name'].lower().startswith(self.config.project_name.lower()) \
+                    and app['entity']['state'].lower() == 'started':
+                app_obj = Object()
+                app_obj.name = app['entity']['name']
+                app_obj.guid = app['metadata']['guid']
+                started_apps.append(app_obj)
+
+        for i, started_app in enumerate(started_apps):
+            print(started_app)
+            if started_app.name.lower() == version_to_look_for and not force_deploy:
+                commons.print_msg(CloudFoundry.clazz, method, "App version {} already exists and is running. "
+                                                              "Cannot perform zero-downtime deployment.  To "
+                                                              "override, set force flag = 'true'".format(
+                    version_to_look_for), 'ERROR')
+
+                self._cf_logout()
+                exit(1)
+
+            elif started_app.name.lower() == version_to_look_for and force_deploy:
+                commons.print_msg(CloudFoundry.clazz, method, "Already found {} but force_deploy turned on. "
+                                                              "Continuing with deployment.  Downtime will occur "
+                                                              "during deployment.".format(version_to_look_for))
+        CloudFoundry.started_apps = started_apps
+
+        commons.print_msg(CloudFoundry.clazz, method, "found {} started apps".format(len(started_apps)))
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
@@ -304,15 +412,17 @@ class CloudFoundry(Cloud):
 
         stop_old_apps_failed = False
 
-        for line in CloudFoundry.started_apps.splitlines():
-            version_to_look_for = self.config.project_name+'-'+self.config.version_number
+        version_to_look_for = "{name}-{version}".format(name=self.config.project_name.lower(),
+                                                        version=self.config.version_number)
 
-            if line.decode("utf-8") != version_to_look_for:
-                commons.print_msg(CloudFoundry.clazz, method, "Scaling down {}".format(line.decode("utf-8")))
+        for line in CloudFoundry.started_apps:
+            if line.name.lower() != version_to_look_for:
+                commons.print_msg(CloudFoundry.clazz, method, "Scaling down {}".format(line.name))
 
                 cmd = "{path}cf scale {app} -i 1".format(path=CloudFoundry.path_to_cf,
-                                                         app=line.decode("utf-8"))
+                                                         app=line.name)
 
+                commons.print_msg(CloudFoundry.clazz, method, cmd)
                 cf_scale = subprocess.Popen(cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
                 try:
@@ -332,7 +442,7 @@ class CloudFoundry(Cloud):
                     stop_old_apps_failed = True
 
                 stop_cmd = "{path}cf stop {project}".format(path=CloudFoundry.path_to_cf,
-                                                            project=line.decode("utf-8"))
+                                                            project=line.name)
 
                 commons.print_msg(CloudFoundry.clazz, method, stop_cmd)
                 cf_stop = subprocess.Popen(stop_cmd.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -353,13 +463,13 @@ class CloudFoundry(Cloud):
                     commons.print_msg(CloudFoundry.clazz, method, "Timed out calling".format(cmd), 'WARN')
                     stop_old_apps_failed = True
             else:
-                commons.print_msg(CloudFoundry.clazz, method, "Skipping scale down for {}".format(line.decode("utf-8")))
+                commons.print_msg(CloudFoundry.clazz, method, "Skipping scale down for {}".format(line.name))
 
-        if stop_old_apps_failed:
-            cf_stop.kill()
-            # cf_stop.communicate()
-            os.system('stty sane')
-            self._cf_logout()
+        # if stop_old_apps_failed:
+        #     cf_stop.kill()
+        #     # cf_stop.communicate()
+        #     os.system('stty sane')
+        #     self._cf_logout()
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
@@ -369,44 +479,41 @@ class CloudFoundry(Cloud):
 
         unmap_delete_previous_versions_failed = False
 
-        for line in CloudFoundry.stopped_apps.splitlines():
+        for line in CloudFoundry.stopped_apps:
             if "{proj}-{ver}".format(proj=self.config.project_name,
-                                     ver=self.config.version_number).lower() == line.decode("utf-8").lower():
+                                     ver=self.config.version_number).lower() == line.name.lower():
                 commons.print_msg(CloudFoundry.clazz, method, "{} exists. Not removing routes for it.".format(
-                    line.decode("utf-8").lower()))
+                    line.name.lower()))
             else:
-                cmd1 = "{}cf routes".format(CloudFoundry.path_to_cf)
-                cmd2 = "grep {}".format(line.decode("utf-8"))
-                cmd3 = ["awk", "{{print $2}}"]
+                bearer_token = "bearer {access_token}".format(access_token=self.api_token)
 
-                cmd_string = cmd1+cmd2+str(cmd3)
-                commons.print_msg(CloudFoundry.clazz, method, cmd_string)
-                run1 = subprocess.Popen(cmd1.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                run2 = subprocess.Popen(cmd2.split(), stdin=run1.stdout, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                existing_routes = subprocess.Popen(cmd3, stdin=run2.stdout, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                pcf_route_headers = {'Authorization': bearer_token}
+
+                apps_url = "https://{api}/v2/apps/{}/routes".format(line.guid)
+                try:
+                    resp = requests.get(apps_url, headers=pcf_route_headers, verify=False)
+                except requests.ConnectionError:
+                    commons.print_msg(CloudFoundry.clazz, method, 'Request to Cloud Foundry timed out.', 'ERROR')
+                    exit(1)
+                except:
+                    commons.print_msg(CloudFoundry.clazz, method,
+                                      "The cloud foundry api routes call failed to {} has failed".
+                                      format(apps_url), 'ERROR')
+                    exit(1)
+
+                json_data = json.loads(resp.text)
 
                 if CloudFoundry.cf_domain is not None:
                     try:
-                        run1.stdout.close()
-                        run2.stdout.close()
-                        existing_routes_output, err = existing_routes.communicate(timeout=120)
-
-                        cmd_string = cmd1+cmd2+str(cmd3)
-                        if existing_routes.returncode != 0:
-                            commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return code of {rtn}"
-                                              .format(command=cmd_string,
-                                                     rtn=existing_routes.returncode),
-                                             'ERROR')
-
-                        for route_line in existing_routes_output.splitlines():
+                        for i, route in enumerate(json_data['resources']):
                             commons.print_msg(CloudFoundry.clazz, method, "Removing route {route} from {line}".format(
-                                route=route_line.decode("utf-8"), line=line.decode("utf-8")))
+                                route=route['entity']['host'], line=line.name))
 
                             cmd = "{path}cf unmap-route {old_app} {cf_domain} -n {route_line}".format(
                                 path=CloudFoundry.path_to_cf,
-                                old_app=line.decode("utf-8"),
+                                old_app=line.name,
                                 cf_domain=CloudFoundry.cf_domain,
-                                route_line=route_line.decode("utf-8"))
+                                route_line=route['entity']['host'])
 
                             commons.print_msg(CloudFoundry.clazz, method, cmd)
 
@@ -422,21 +529,22 @@ class CloudFoundry(Cloud):
                                 if unmap_route.returncode != 0:
                                     unmap_delete_previous_versions_failed = True
                                     commons.print_msg(CloudFoundry.clazz, method, "Failed calling {command}. Return "
-                                                                                 "code of {rtn}".format(
-                                                                                    command=cmd,
-                                                                                    rtn=unmap_route.returncode),
-                                                     'ERROR')
+                                                                                  "code of {rtn}".format(
+                                        command=cmd,
+                                        rtn=unmap_route.returncode),
+                                                      'ERROR')
 
                             except TimeoutExpired:
                                 unmap_delete_previous_versions_failed = True
-                                commons.print_msg(CloudFoundry.clazz, method, "Timed out calling {}".format(cmd), 'ERROR')
+                                commons.print_msg(CloudFoundry.clazz, method, "Timed out calling {}".format(cmd),
+                                                  'ERROR')
 
                     except TimeoutExpired:
                         commons.print_msg(CloudFoundry.clazz, method, "Timed out calling {}".format(cmd), 'ERROR')
                         unmap_delete_previous_versions_failed = True
 
                 if unmap_delete_previous_versions_failed is False:
-                    delete_cmd = "{path}cf delete {project} -f".format(project=line.decode("utf-8"),
+                    delete_cmd = "{path}cf delete {project} -f".format(project=line.name,
                                                                        path=CloudFoundry.path_to_cf)
 
                     commons.print_msg(CloudFoundry.clazz, method, delete_cmd)
@@ -462,8 +570,6 @@ class CloudFoundry(Cloud):
                         os.system('stty sane')
 
                 if unmap_delete_previous_versions_failed:
-                    existing_routes.kill()
-                    # existing_routes.communicate()
                     os.system('stty sane')
                     self._cf_logout()
                     exit(1)
@@ -955,7 +1061,7 @@ class CloudFoundry(Cloud):
             exit(1)
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
-        
+
     def _restart_app(self, app):
         method = '_restart_app'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
