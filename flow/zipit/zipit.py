@@ -29,7 +29,8 @@ class ZipIt:
         commons.print_msg(ZipIt.clazz, method, 'begin')
 
         file_with_path = name.split('/')
-
+        print('yoyoyo')
+        print(name.split('/'))
         try:
             with tarfile.open(file_with_path[-1], 'w') as tar:
                 tar.add(contents, name)
