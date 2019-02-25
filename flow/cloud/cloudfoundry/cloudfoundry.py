@@ -43,10 +43,7 @@ class CloudFoundry(Cloud):
         if config_override is not None:
             self.config = config_override
 
-        if os.environ.get('WORKSPACE'):  # for Jenkins
-            CloudFoundry.path_to_cf = os.environ.get('WORKSPACE') + '/'
-        else:
-            CloudFoundry.path_to_cf = ""
+        CloudFoundry.path_to_cf = ""
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
@@ -84,16 +81,6 @@ class CloudFoundry(Cloud):
             commons.print_msg(CloudFoundry.clazz, method, 'Failed to find API token', 'ERROR')
             exit(1)
 
-        self._get_space_guid()
-
-        self._get_stopped_apps()
-
-        self._get_started_apps()
-
-        self._unmap_delete_previous_versions()
-
-        self._stop_old_app_servers()
-
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
     def download_cf_cli(self):
@@ -122,9 +109,6 @@ class CloudFoundry(Cloud):
     def _get_space_guid(self):
         method = '_get_space_guid'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
-
-        #TODO Remove this
-        CloudFoundry.cf_space = 'ro-test'
 
         bearer_token = "bearer {access_token}".format(access_token=CloudFoundry.api_token)
 
@@ -239,6 +223,7 @@ class CloudFoundry(Cloud):
         apps_url = "https://{api}/v2/spaces/{space_guid}/apps".format(api=CloudFoundry.cf_api_endpoint,
                                                                       space_guid=CloudFoundry.space_guid)
 
+        commons.print_msg(CloudFoundry.clazz, method, apps_url)
         stopped_apps = []
 
         try:
@@ -252,9 +237,8 @@ class CloudFoundry(Cloud):
             exit(1)
 
         json_data = json.loads(resp.text)
-
+        
         for i, app in enumerate(json_data['resources']):
-            print(app['entity']['name'].lower())
             if app['entity']['name'].lower().startswith(self.config.project_name.lower()) \
                     and app['entity']['state'].lower() == 'stopped':
                 app_obj = Object()
@@ -309,7 +293,6 @@ class CloudFoundry(Cloud):
                 started_apps.append(app_obj)
 
         for i, started_app in enumerate(started_apps):
-            print(started_app)
             if started_app.name.lower() == version_to_look_for and not force_deploy:
                 commons.print_msg(CloudFoundry.clazz, method, "App version {} already exists and is running. "
                                                               "Cannot perform zero-downtime deployment.  To "
@@ -382,7 +365,8 @@ class CloudFoundry(Cloud):
 
         while cf_push.poll() is None:
             line = cf_push.stdout.readline().decode('utf-8').strip(' \r\n')
-            commons.print_msg(CloudFoundry.clazz, method, line)
+            if(len(line) > 0):
+                commons.print_msg(CloudFoundry.clazz, method, line)
 
         try:
             cf_push.communicate(timeout=300)
@@ -489,7 +473,7 @@ class CloudFoundry(Cloud):
 
                 pcf_route_headers = {'Authorization': bearer_token}
 
-                apps_url = "https://{api}/v2/apps/{}/routes".format(line.guid)
+                apps_url = "https://{api}/v2/apps/{guid}/routes".format(api=CloudFoundry.cf_api_endpoint, guid=line.guid)
                 try:
                     resp = requests.get(apps_url, headers=pcf_route_headers, verify=False)
                 except requests.ConnectionError:
@@ -640,8 +624,8 @@ class CloudFoundry(Cloud):
 
         while cf_login.poll() is None:
             line = cf_login.stdout.readline().decode('utf-8').strip(' \r\n')
-
-            commons.print_msg(CloudFoundry.clazz, method, line)
+            if(len(line) > 0):
+                commons.print_msg(CloudFoundry.clazz, method, line)
 
             if 'credentials were rejected' in line.lower():
                 commons.print_msg(CloudFoundry.clazz, method, "Make sure that your credentials are correct for {}"
@@ -679,6 +663,8 @@ class CloudFoundry(Cloud):
 
         cmd_api = "{path}cf api {api} --skip-ssl-validation".format(path=CloudFoundry.path_to_cf,
                                           api=CloudFoundry.cf_api_endpoint)
+        
+        commons.print_msg(CloudFoundry.clazz, method, cmd_api)
 
         cf_api = subprocess.Popen(cmd_api.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
@@ -702,7 +688,7 @@ class CloudFoundry(Cloud):
                                                          cf_pwd=CloudFoundry.cf_pwd)
 
         cf_login = subprocess.Popen(cmd_auth.split(), shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
+        
         try:
             cf_login_output, cf_login_err = cf_login.communicate(timeout=120)
 
@@ -983,6 +969,10 @@ class CloudFoundry(Cloud):
     def deploy(self, force_deploy=False, manifest=None, blue_green=False):
         method = 'deploy'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
+
+        self.api_login()
+
+        self._get_space_guid()
 
         self._verify_required_attributes()
 

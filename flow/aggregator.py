@@ -46,6 +46,8 @@ def main():
 
     parser.add_argument('-q', '--quiet', help="Silence the logging to stdout", default='False')
 
+    parser.add_argument('-z', '--deploy_directory', help="Silence the logging to stdout")
+    
     load_task_parsers(subparsers)
 
     plugins = []
@@ -92,7 +94,6 @@ def main():
 
     if task != 'github' and task in tasks_requiring_github:
         github = GitHub()
-
         if 'version' in args and args.version is not None and len(args.version.strip()) > 0 and args.version.strip(
                                                                                                 ).lower() != 'latest':
             # The only time a user should be targeting a snapshot environment and specifying a version
@@ -201,6 +202,10 @@ def main():
             create_deployment_directory()
             artifactory.download_and_extract_artifacts_locally(BuildConfig.push_location + '/', extract=args.extract in ['y', 'yes', 'true'] or args.extract is None)
     elif task == 'cf':
+        if 'user' in args and args.user is not None:
+            os.environ['DEPLOYMENT_USER'] = args.user
+            os.environ['DEPLOYMENT_PWD'] = args.password
+
         if BuildConfig.build_env_info['cf']:
             if 'version' not in args:
                 commons.print_msg(clazz, method, 'Version number not passed in for deployment. Format is: v{'
@@ -238,15 +243,16 @@ def main():
                 # TODO make this configurable in case they are using
                 create_deployment_directory()
 
-                if BuildConfig.artifact_extension is None and BuildConfig.artifact_extensions is None:
-                    commons.print_msg(clazz, method, 'Attempting to retrieve and deploy from GitHub.')
+                #TODO uncomment this back without breaking applications where we aren't donloading from artifactory within flow or downloading from github 
+                # if BuildConfig.artifact_extension is None and BuildConfig.artifact_extensions is None:
+                #     commons.print_msg(clazz, method, 'Attempting to retrieve and deploy from GitHub.')
 
-                    github.download_code_at_version()
-                else:
-                    commons.print_msg(clazz, method, 'Attempting to retrieve and deploy from Artifactory.')
-                    artifactory = Artifactory()
+                #     github.download_code_at_version()
+                # else:
+                #     commons.print_msg(clazz, method, 'Attempting to retrieve and deploy from Artifactory.')
+                #     artifactory = Artifactory()
 
-                    artifactory.download_and_extract_artifacts_locally(BuildConfig.push_location + '/')
+                #     artifactory.download_and_extract_artifacts_locally(BuildConfig.push_location + '/')
 
                 force = False
 
@@ -418,6 +424,10 @@ def load_task_parsers(subparsers):
                                             formatter_class=RawTextHelpFormatter)
     cfdeploy_parser.add_argument('action', help='CF task. Possible values: \n '
                                                 'deploy - deploy application to Cloud Foundry')
+    cfdeploy_parser.add_argument('-p', '--password', help='(optional) Allows deployment password to be passed from '
+                                                         'command line instead of environment variable. ')
+    cfdeploy_parser.add_argument('-u', '--user', help='(optional) Allows deployment user to be passed from '
+                                                         'command line instead of environment variable. ')
     cfdeploy_parser.add_argument('-v', '--version', help='(optional) Defaults to latest version.  If deployment is '
                                                          'for a previous version, pass in the version number here. ')
     cfdeploy_parser.add_argument('-f', '--force', help='(optional) Force the deploy even if the same version number is '
