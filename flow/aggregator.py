@@ -265,10 +265,12 @@ def main():
                     commons.print_msg(clazz, method, "Setting manifest to {}".format(args.manifest))
                     manifest = args.manifest
 
-                if args.action == 'deploy':
-                    cf.deploy(force_deploy=force, manifest=manifest)
-                elif args.action =='bluegreen':
-                    cf.deploy(force_deploy=force, manifest=manifest, blue_green=True)
+                #TODO put blue/green back
+                cf.deploy(force_deploy=force, manifest=manifest)
+                #if args.action == 'deploy':
+                #   cf.deploy(force_deploy=force, manifest=manifest)
+                #elif args.action =='bluegreen':
+                #    cf.deploy(force_deploy=force, manifest=manifest, blue_green=True)
 
             commons.print_msg(clazz, method, 'Checking if we can attach the output to the CR')
 
