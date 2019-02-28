@@ -239,7 +239,7 @@ class CloudFoundry(Cloud):
         json_data = json.loads(resp.text)
         
         for i, app in enumerate(json_data['resources']):
-            if app['entity']['name'].lower().startswith(self.config.project_name.lower()) \
+            if app['entity']['name'].lower().startswith("{}-".format(self.config.project_name.lower())) \
                     and app['entity']['state'].lower() == 'stopped':
                 app_obj = Object()
                 app_obj.name = app['entity']['name']
@@ -285,7 +285,7 @@ class CloudFoundry(Cloud):
         json_data = json.loads(resp.text)
 
         for i, app in enumerate(json_data['resources']):
-            if app['entity']['name'].lower().startswith(self.config.project_name.lower()) \
+            if app['entity']['name'].lower().startswith("{}-".format(self.config.project_name.lower())) \
                     and app['entity']['state'].lower() == 'started':
                 app_obj = Object()
                 app_obj.name = app['entity']['name']
