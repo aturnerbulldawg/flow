@@ -35,7 +35,6 @@ class CloudFoundry(Cloud):
     space_guid = None
     cf_api_login_endpoint = None
 
-
     def __init__(self, config_override=None):
         method = '__init__'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
@@ -47,13 +46,8 @@ class CloudFoundry(Cloud):
 
         commons.print_msg(CloudFoundry.clazz, method, 'end')
 
-    def api_login(self):
+    def _api_login(self):
         method = '_api_login'
-
-        #TODO Remove this
-        CloudFoundry.cf_api_login_endpoint = 'login.sys.fog.onefiserv.net'
-
-        self._verify_required_attributes()
 
         payload = {'grant_type': 'password', 'password': CloudFoundry.cf_pwd,
                    'username': CloudFoundry.cf_user}
@@ -168,6 +162,7 @@ class CloudFoundry(Cloud):
             CloudFoundry.cf_org = self.config.build_env_info['cf']['org']
             CloudFoundry.cf_space = self.config.build_env_info['cf']['space']
             CloudFoundry.cf_api_endpoint = self.config.build_env_info['cf']['apiEndpoint']
+            CloudFoundry.cf_api_login_endpoint = self.config.build_env_info['cf']['loginEndpoint']
             if 'domain' in self.config.build_env_info['cf']:  # this is not required bc could be passed in via manifest
                 CloudFoundry.cf_domain = self.config.build_env_info['cf']['domain']
 
@@ -970,11 +965,11 @@ class CloudFoundry(Cloud):
         method = 'deploy'
         commons.print_msg(CloudFoundry.clazz, method, 'begin')
 
-        self.api_login()
+        self._verify_required_attributes()
+
+        self._api_login()
 
         self._get_space_guid()
-
-        self._verify_required_attributes()
 
         self.download_cf_cli()
 

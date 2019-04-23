@@ -92,7 +92,9 @@ def main():
 
     tasks_requiring_github.extend(['sonar', 'tracker', 'jira', 'slack', 'artifactory', 'cf', 'zipit', 'gcappengine', 'servicenow'])
 
-    if task != 'github' and task in tasks_requiring_github:
+    github_is_configured = ('github' in BuildConfig.json_config)
+
+    if task != 'github' and task in tasks_requiring_github and github_is_configured:
         github = GitHub()
         if 'version' in args and args.version is not None and len(args.version.strip()) > 0 and args.version.strip(
                                                                                                 ).lower() != 'latest':
@@ -117,9 +119,10 @@ def main():
             # validate after processing what the version_number is set to.
             commons.print_msg(clazz, method, "Setting version number based on argument {}"
                               .format(BuildConfig.version_number))
-
         else:
             BuildConfig.version_number = github.get_git_last_tag()
+    else:
+        BuildConfig.version_number = args.version.strip()
 
     if task == 'github':
         github = GitHub()
