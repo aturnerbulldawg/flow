@@ -118,7 +118,7 @@ def test_aggregator_github_version_tracker_snapshot():
     _config.version_strategy = 'tracker'
     _config.artifact_category = 'snapshot'
 
-    flow.aggregator.call_github_version(_github, _tracker, _config)
+    flow.aggregator.call_github_version(_github, _tracker, None, _config)
 
     _github.get_all_git_commit_history_between_provided_tags.assert_called_with([0, 1, 4, 8])
     _tracker.get_details_for_all_stories.assert_called_with(['12345678', '987654321'])
@@ -143,7 +143,7 @@ def test_aggregator_github_version_tracker_release():
     _config.version_strategy = 'tracker'
     _config.artifact_category = 'release'
 
-    flow.aggregator.call_github_version(_github, _tracker, _config)
+    flow.aggregator.call_github_version(_github, _tracker, None, _config)
 
     print(str(_github.method_calls))
 
@@ -169,7 +169,7 @@ def test_aggregator_github_version_manual_release():
     _parser.add_argument('--release-notes-output-path', type=open)
     _args = _parser.parse_args(['--version', 'v1.1.0.0'])
 
-    flow.aggregator.call_github_version(_github, None, _config, args=_args)
+    flow.aggregator.call_github_version(_github, None, None, _config, args=_args)
 
     print(str(_github.method_calls))
 
@@ -195,7 +195,7 @@ def test_aggregator_github_version_manual_snapshot():
     _parser.add_argument('--release-notes-output-path', type=open)
     _args = _parser.parse_args(['--version', 'v1.1.0.0'])
 
-    flow.aggregator.call_github_version(_github, None, _config, args=_args)
+    flow.aggregator.call_github_version(_github, None, None, _config, args=_args)
 
     print(str(_github.method_calls))
 
@@ -224,7 +224,7 @@ def test_aggregator_github_version_tracker_snapshot_no_publish():
     _parser.add_argument('--release-notes-output-path', type=open)
     _args = _parser.parse_args(['--no-publish'])
 
-    flow.aggregator.call_github_version(_github, _tracker, _config, args=_args)
+    flow.aggregator.call_github_version(_github, _tracker, None, _config, args=_args)
 
     _tracker.get_details_for_all_stories.assert_called_with(['12345678', '987654321'])
     _github.add_tag_and_release_notes_to_github.assert_not_called()
@@ -253,7 +253,7 @@ def test_aggregator_github_version_tracker_release_no_publish():
     _parser.add_argument('--release-notes-output-path', type=open)
     _args = _parser.parse_args(['--no-publish'])
 
-    flow.aggregator.call_github_version(_github, _tracker, _config, args=_args)
+    flow.aggregator.call_github_version(_github, _tracker, None, _config, args=_args)
 
     print(str(_github.method_calls))
 
@@ -279,7 +279,7 @@ def test_aggregator_github_version_manual_release_no_publish():
     _parser.add_argument('--release-notes-output-path', type=open)
     _args = _parser.parse_args(['--version', 'v1.1.0.0', '--no-publish'])
 
-    flow.aggregator.call_github_version(_github, None, _config, args=_args)
+    flow.aggregator.call_github_version(_github, None, None, _config, args=_args)
 
     print(str(_github.method_calls))
 
@@ -305,7 +305,7 @@ def test_aggregator_github_version_manual_snapshot_no_publish():
     _parser.add_argument('--release-notes-output-path', type=open)
     _args = _parser.parse_args(['--version', 'v1.1.0.0', '--no-publish'])
 
-    flow.aggregator.call_github_version(_github, None, _config, args=_args)
+    flow.aggregator.call_github_version(_github, None, None, _config, args=_args)
 
     print(str(_github.method_calls))
 
@@ -335,7 +335,7 @@ def test_aggregator_github_version_tracker_snapshot_release_notes_output():
     )
     _args.release_notes_output_path.write = MagicMock(return_value=None)
 
-    flow.aggregator.call_github_version(_github, _tracker, _config, args=_args)
+    flow.aggregator.call_github_version(_github, _tracker, None, _config, args=_args)
 
     _tracker.get_details_for_all_stories.assert_called_with(['12345678', '987654321'])
     _github.add_tag_and_release_notes_to_github.assert_called_with([1, 0, 0, 1], 'No Release Notes')
@@ -366,7 +366,7 @@ def test_aggregator_github_version_tracker_release_release_notes_output():
     )
     _args.release_notes_output_path.write = MagicMock(return_value=None)
 
-    flow.aggregator.call_github_version(_github, _tracker, _config, args=_args)
+    flow.aggregator.call_github_version(_github, _tracker, None, _config, args=_args)
 
     print(str(_github.method_calls))
 
@@ -395,7 +395,7 @@ def test_aggregator_github_version_manual_release_release_notes_output():
     )
     _args.release_notes_output_path.write = MagicMock(return_value=None)
 
-    flow.aggregator.call_github_version(_github, None, _config, args=_args)
+    flow.aggregator.call_github_version(_github, None, None, _config, args=_args)
 
     print(str(_github.method_calls))
 
@@ -424,7 +424,7 @@ def test_aggregator_github_version_manual_snapshot_release_notes_output():
     )
     _args.release_notes_output_path.write = MagicMock(return_value=None)
 
-    flow.aggregator.call_github_version(_github, None, _config, args=_args)
+    flow.aggregator.call_github_version(_github, None, None, _config, args=_args)
 
     print(str(_github.method_calls))
 
@@ -456,7 +456,7 @@ def test_aggregator_github_version_tracker_snapshot_no_publish_release_notes_out
     )
     _args.release_notes_output_path.write = MagicMock(return_value=None)
 
-    flow.aggregator.call_github_version(_github, _tracker, _config, args=_args)
+    flow.aggregator.call_github_version(_github, _tracker, None, _config, args=_args)
 
     _tracker.get_details_for_all_stories.assert_called_with(['12345678', '987654321'])
     _github.add_tag_and_release_notes_to_github.assert_not_called()
@@ -487,7 +487,7 @@ def test_aggregator_github_version_tracker_release_no_publish_release_notes_outp
     )
     _args.release_notes_output_path.write = MagicMock(return_value=None)
 
-    flow.aggregator.call_github_version(_github, _tracker, _config, args=_args)
+    flow.aggregator.call_github_version(_github, _tracker, None, _config, args=_args)
 
     print(str(_github.method_calls))
 
@@ -516,7 +516,7 @@ def test_aggregator_github_version_manual_release_no_publish_release_notes_outpu
     )
     _args.release_notes_output_path.write = MagicMock(return_value=None)
 
-    flow.aggregator.call_github_version(_github, None, _config, args=_args)
+    flow.aggregator.call_github_version(_github, None, None, _config, args=_args)
 
     print(str(_github.method_calls))
 
@@ -545,7 +545,7 @@ def test_aggregator_github_version_manual_snapshot_no_publish_release_notes_outp
     )
     _args.release_notes_output_path.write = MagicMock(return_value=None)
 
-    flow.aggregator.call_github_version(_github, None, _config, args=_args)
+    flow.aggregator.call_github_version(_github, None, None, _config, args=_args)
 
     print(str(_github.method_calls))
 
@@ -624,7 +624,7 @@ def test_aggregator_github_outputs_version():
 
     _open_mock = mock_open()
     with patch('__main__.open', _open_mock, create=True):
-        flow.aggregator.call_github_version(_github, _tracker, _config, file_path='somefilepath', open_func=_open_mock)
+        flow.aggregator.call_github_version(_github, _tracker, None, _config, file_path='somefilepath', open_func=_open_mock)
 
     print('Mock Call Stack\n' + str(_github.method_calls))
 

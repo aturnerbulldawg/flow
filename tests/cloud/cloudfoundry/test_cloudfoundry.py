@@ -2,7 +2,7 @@ import os
 import subprocess
 from unittest.mock import MagicMock
 from unittest.mock import patch
-
+import json
 import pytest
 from flow.cloud.cloudfoundry.cloudfoundry import CloudFoundry
 
@@ -95,6 +95,75 @@ mock_build_config_missing_org_dict = {
         }
     }
 }
+
+mock_running_applications = {
+    "total_results": 1,
+    "total_pages": 1,
+    "prev_url": "null",
+    "next_url": "null",
+    "resources": [
+        {
+            "metadata": {
+                "guid": "abc1234-e751-432f-9cc5-f8b3ec2f80aa",
+                "url": "/v2/apps/abc1234-e751-432f-9cc5-f8b3ec2f80aa",
+                "created_at": "2018-09-17T19:30:47Z",
+                "updated_at": "2019-06-12T12:17:30Z"
+            },
+            "entity": {
+                "name": "CI-HelloWorld-v2.9.0+1",
+                "production": "false",
+                "space_guid": "abc4444-3202-429c-9223-62556b4385a8",
+                "stack_guid": "zzzz-88dd-4734-a963-d692716760d1",
+                "buildpack": "hwc_buildpack",
+                "detected_buildpack": "hwc",
+                "detected_buildpack_guid": "yyyy-dee3-4630-970b-144df8636a8e",
+                "environment_json": {
+                    "Redis:Channel": "configuration:Image.yml",
+                    "VaultServiceBindingName": "vault",
+                    "management:endpoints:path": "/abc1234/cloudfoundryapplication",
+                    "spring:cloud:config:name": "Image",
+                    "spring:cloud:config:timeout": "60000",
+                    "spring:cloud:config:validate_certificates": "false"
+                },
+                "memory": 512,
+                "instances": 1,
+                "disk_quota": 512,
+                "state": "STARTED",
+                "version": "zzz-00ea-4876-87e4-7290249b446a",
+                "command": "null",
+                "console": "false",
+                "debug": "null",
+                "staging_task_id": "aaa-9060-44dd-946f-df765787bb25",
+                "package_state": "STAGED",
+                "health_check_type": "http",
+                "health_check_timeout": "null",
+                "health_check_http_endpoint": "/test/test.ashx?Action=healthcheck",
+                "staging_failed_reason": "null",
+                "staging_failed_description": "null",
+                "diego": "true",
+                "docker_image": "null",
+                "docker_credentials": {
+                    "username": "null",
+                    "password": "null"
+                },
+                "package_updated_at": "2019-06-12T12:17:26Z",
+                "detected_start_command": ".cloudfoundry\\hwc.exe",
+                "enable_ssh": "true",
+                "ports": [
+                    "8080"
+                ],
+                "space_url": "/v2/spaces/abc-3202-429c-9223-62556b4385a8",
+                "stack_url": "/v2/stacks/def-88dd-4734-a963-d692716760d1",
+                "routes_url": "/v2/apps/ghi-e751-432f-9cc5-f8b3ec2f80aa/routes",
+                "events_url": "/v2/apps/jkl-e751-432f-9cc5-f8b3ec2f80aa/events",
+                "service_bindings_url": "/v2/apps/12345-e751-432f-9cc5-f8b3ec2f80aa/service_bindings",
+                "route_mappings_url": "/v2/apps/55555-e751-432f-9cc5-f8b3ec2f80aa/route_mappings"
+            }
+        }
+    ]
+}
+
+
 
 mock_started_apps_already_started = 'CI-HelloWorld-v2.9.0+1'
 
@@ -194,14 +263,9 @@ def test_verify_required_attributes_missing_org(monkeypatch):
 
 
 def test_get_started_apps_already_started():
-
         with patch('flow.utils.commons.print_msg') as mock_printmsg_fn:
-
-            with patch.object(subprocess, 'Popen') as mocked_popen:
+            with patch('requests.get', side_effect=mocked_requests_get):
                 with pytest.raises(SystemExit):
-                    mocked_popen.return_value.returncode = 0
-                    mocked_popen.return_value.communicate.return_value = (mock_started_apps_already_started.encode(),
-                                                                          'FAKE_ERR_OUTPUT')
                     _b = MagicMock(BuildConfig)
                     _b.project_name = 'CI-HelloWorld'
                     _b.version_number = 'v2.9.0+1'
@@ -210,19 +274,25 @@ def test_get_started_apps_already_started():
                     with patch.object(_cf, '_cf_logout'):
                         _cf._get_started_apps()
 
-        mock_printmsg_fn.assert_any_call('CloudFoundry', '_get_started_apps', "App version CI-HelloWorld-v2.9.0+1 "
-                                                                              "already exists and is running. Cannot "
-                                                                              "perform zero-downtime deployment.  To "
-                                                                              "override, set force flag = 'true'",
-                                         'ERROR')
+        mock_printmsg_fn.assert_called_with('CloudFoundry', '_get_started_apps', "App version ci-helloworld-v2.9.0+1 already exists and is running. Cannot perform zero-downtime deployment.  To override, set force flag = 'true'", 'ERROR')
+
+
+
+def mocked_requests_get(*args, **kwargs):
+    class MockResponse:
+        def __init__(self, json_data, status_code):
+            self.text = json.dumps(json_data)
+            self.status_code = status_code
+
+        def json(self):
+            return self.json_data
+
+    return MockResponse(mock_running_applications, 200)
 
 
 def test_get_started_apps_already_started_force_deploy():
-
         with patch('flow.utils.commons.print_msg') as mock_printmsg_fn:
-            with patch.object(subprocess, 'Popen') as mocked_popen:
-                mocked_popen.return_value.returncode = 0
-                mocked_popen.return_value.communicate.return_value = (mock_started_apps_already_started.encode(), 'FAKE_ERR_OUTPUT')
+            with patch('requests.get', side_effect=mocked_requests_get):
                 _b = MagicMock(BuildConfig)
                 _b.project_name = 'CI-HelloWorld'
                 _b.version_number = 'v2.9.0+1'
@@ -230,26 +300,8 @@ def test_get_started_apps_already_started_force_deploy():
 
                 with patch.object(_cf, '_cf_logout'):
                     _cf._get_started_apps(True)
-        mock_printmsg_fn.assert_any_call('CloudFoundry', '_get_started_apps', "Already found CI-HelloWorld-v2.9.0+1 but force_deploy turned on. Continuing with deployment.  Downtime will occur during deployment.")
 
-
-def test_get_started_apps_already_started_failed_cmd():
-
-        with patch('flow.utils.commons.print_msg') as mock_printmsg_fn:
-            with pytest.raises(SystemExit):
-                with patch.object(subprocess, 'Popen') as mocked_popen:
-                    mocked_popen.return_value.returncode = 1
-                    mocked_popen.return_value.communicate.return_value = (mock_started_apps_already_started.encode(), 'FAKE_ERR_OUTPUT')
-                    _b = MagicMock(BuildConfig)
-                    _b.project_name = 'CI-HelloWorld'
-                    _b.version_number = 'v2.9.0+1'
-                    _cf = CloudFoundry(_b)
-
-                    with patch.object(_cf, '_cf_logout'):
-                        _cf._get_started_apps('true')
-        mock_printmsg_fn.assert_any_call('CloudFoundry', '_get_started_apps', "Failed calling cf apps | grep CI-HelloWorld*-v\\d*\\.\\d*\\.\\d* | grep started | awk '{print $1}'. Return code of 1", 'ERROR')
-
-
+        mock_printmsg_fn.assert_any_call('CloudFoundry', '_get_started_apps', "Already found ci-helloworld-v2.9.0+1 but force_deploy turned on. Continuing with deployment.  Downtime will occur during deployment.")
 
 
 def test_find_deployable_multiple_files():

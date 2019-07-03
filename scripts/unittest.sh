@@ -15,8 +15,10 @@ else
     exit 1
 fi
 
-pip install -r requirements.txt
-pip install -e flow/
+#mkvirtualenv flow
+
+pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org  -r requirements.txt
+pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -e .
 pip list --format=columns
 
 echo "Executing the tests and placing the output in test/results.txt"
